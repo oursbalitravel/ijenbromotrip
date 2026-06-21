@@ -49,36 +49,16 @@ const defaultState = {
   revenue: 45230,
 };
 
-async function saveStorage(data) {
+function saveStorage(data) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-
-  try {
-    await fetch(`${API_BASE_URL}/api/data`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  } catch (error) {
-    console.warn('Unable to save admin data to server:', error);
-  }
 }
 
-async function loadStorage() {
+function loadStorage() {
   if (typeof window === 'undefined') return defaultState;
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/data`);
-    if (response.ok) {
-      const payload = await response.json();
-      return payload;
-    }
-  } catch (error) {
-    console.warn('Unable to load admin data from server:', error);
-  }
-
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return defaultState;
+
   try {
     return JSON.parse(raw);
   } catch {

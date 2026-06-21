@@ -1,6 +1,6 @@
 const ADMIN_STORAGE_KEY = 'ijen-bromo-admin-data';
 
-function loadAdminTripsFromStorage() {
+function loadAdminTrips() {
   if (typeof window === 'undefined') return [];
   const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
   if (!raw) return [];
@@ -12,23 +12,6 @@ function loadAdminTripsFromStorage() {
   } catch (error) {
     return [];
   }
-}
-
-async function loadAdminTrips() {
-  if (typeof window === 'undefined') return [];
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/trips`);
-    if (response.ok) {
-      const trips = await response.json();
-      if (Array.isArray(trips)) return trips;
-      if (trips && Array.isArray(trips.trips)) return trips.trips;
-    }
-  } catch (error) {
-    console.warn('Unable to load admin trips from API, fallback to localStorage', error);
-  }
-
-  return loadAdminTripsFromStorage();
 }
 
 function createPackageCard(trip) {
@@ -52,7 +35,7 @@ function createPackageCard(trip) {
 async function renderAdminPackages() {
   const grid = document.getElementById('packages-grid');
   if (!grid) return;
-  const adminTrips = await loadAdminTrips();
+  const adminTrips = loadAdminTrips();
   if (!adminTrips.length) return;
   grid.innerHTML = '';
   adminTrips.slice(0, 8).forEach((trip) => grid.appendChild(createPackageCard(trip)));
