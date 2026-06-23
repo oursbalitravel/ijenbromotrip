@@ -23,6 +23,11 @@ const defaultLayout = {
     { id: crypto.randomUUID(), label: 'Why Choose Us', href: '#why-us' },
     { id: crypto.randomUUID(), label: 'Blog', href: '#blog' },
   ],
+  footerMenu: [
+    { id: crypto.randomUUID(), label: 'Facebook', href: '#facebook' },
+    { id: crypto.randomUUID(), label: 'Instagram', href: '#instagram' },
+    { id: crypto.randomUUID(), label: 'TikTok', href: '#tiktok' },
+  ],
   sections: [
     { id: 'hero', label: 'Hero', enabled: true, caption: 'Hero', title: 'Your world of joy', text: 'From local escapes to far-flung adventures, find what makes you happy anytime, anywhere.' },
     { id: 'packages', label: 'Trip Package', enabled: true, caption: 'Popular Ijen Bromo Packages', title: 'Best Ijen Bromo Tour Packages', text: 'Handpicked tours to explore Mount Ijen, Mount Bromo, and East Java waterfalls.' },
@@ -239,6 +244,7 @@ function loadStorage() {
           ...(parsed?.layout?.packageGrid || {}),
         },
         headerMenu: Array.isArray(parsed?.layout?.headerMenu) ? parsed.layout.headerMenu : defaultLayout.headerMenu,
+        footerMenu: Array.isArray(parsed?.layout?.footerMenu) ? parsed.layout.footerMenu : defaultLayout.footerMenu,
         sections: Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : defaultLayout.sections,
       },
       destinations: Array.isArray(parsed?.destinations) ? parsed.destinations : defaultState.destinations,
@@ -1364,6 +1370,27 @@ function LayoutView({ layout, onSave, onNotify }) {
     setForm((prev) => ({ ...prev, headerMenu: prev.headerMenu.filter((item) => item.id !== id) }));
   };
 
+  const updateFooterMenu = (id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      footerMenu: (prev.footerMenu || []).map((item) => (item.id === id ? { ...item, [key]: value } : item)),
+    }));
+  };
+
+  const addFooterMenu = () => {
+    setForm((prev) => ({
+      ...prev,
+      footerMenu: [...(prev.footerMenu || []), { id: crypto.randomUUID(), label: 'New Footer Menu', href: '#footer' }],
+    }));
+  };
+
+  const removeFooterMenu = (id) => {
+    setForm((prev) => ({
+      ...prev,
+      footerMenu: (prev.footerMenu || []).filter((item) => item.id !== id),
+    }));
+  };
+
   const handleHeroImageUpload = async (files) => {
     const list = Array.from(files || []);
     if (!list.length) return;
@@ -1485,6 +1512,23 @@ function LayoutView({ layout, onSave, onNotify }) {
             Footer text
             <input value={form.footerText || ''} onChange={(e) => setForm((prev) => ({ ...prev, footerText: e.target.value }))} />
           </label>
+          <div style={{ marginTop: 12 }}>
+            <p className="section-label" style={{ marginBottom: 8 }}>Footer Menu</p>
+            {(form.footerMenu || []).map((item) => (
+              <div key={item.id} className="form-grid-2" style={{ marginBottom: 12 }}>
+                <label>
+                  Menu label
+                  <input value={item.label} onChange={(e) => updateFooterMenu(item.id, 'label', e.target.value)} />
+                </label>
+                <label>
+                  Link target
+                  <input value={item.href} onChange={(e) => updateFooterMenu(item.id, 'href', e.target.value)} placeholder="#instagram or https://..." />
+                </label>
+                <button type="button" className="text-btn text-btn-danger" onClick={() => removeFooterMenu(item.id)}>Delete footer menu</button>
+              </div>
+            ))}
+            <button type="button" className="secondary-btn" onClick={addFooterMenu}>+ Add footer menu</button>
+          </div>
         </div>
 
         <div className="form-actions form-actions-end">

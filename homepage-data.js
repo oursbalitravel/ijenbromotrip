@@ -1,5 +1,6 @@
 const ADMIN_STORAGE_KEY = 'ijen-bromo-admin-data';
 const DB_CONFIG_KEY = 'ijen-bromo-db-config';
+const HOMEPAGE_TRIPS_CACHE_KEY = 'ijen-bromo-homepage-trips-cache';
 
 function sanitizeUrl(url) {
   return (url || '').trim().replace(/\/+$/, '');
@@ -112,6 +113,27 @@ function resolveLayout(adminData) {
   return adminData?.layout || {};
 }
 
+function saveTripsCache(trips) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(HOMEPAGE_TRIPS_CACHE_KEY, JSON.stringify(trips || []));
+  } catch {
+    // Ignore cache write errors.
+  }
+}
+
+function loadTripsCache() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(HOMEPAGE_TRIPS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function applyHeaderMenu(layout) {
   const nav = document.querySelector('.nav-menu');
   const menu = Array.isArray(layout?.headerMenu) ? layout.headerMenu : [];
@@ -123,6 +145,20 @@ function applyHeaderMenu(layout) {
     link.href = item.href || '#hero';
     link.textContent = item.label || 'Menu';
     nav.appendChild(link);
+  });
+}
+
+function applyFooterMenu(layout) {
+  const links = document.querySelector('.social-links');
+  const menu = Array.isArray(layout?.footerMenu) ? layout.footerMenu : [];
+  if (!links || !menu.length) return;
+
+  links.innerHTML = '';
+  menu.forEach((item) => {
+    const link = document.createElement('a');
+    link.href = item.href || '#footer';
+    link.textContent = item.label || 'Footer Link';
+    links.appendChild(link);
   });
 }
 
@@ -252,9 +288,13 @@ async function renderAdminPackages() {
   const layout = resolveLayout(adminData);
 
   applyHeaderMenu(layout);
+  applyFooterMenu(layout);
   applyHeroImages(layout);
   applySectionLayout(layout);
   renderDestinations(adminData);
+
+  // Clear initial hardcoded cards so homepage never silently falls back to old static content.
+  grid.innerHTML = '';
 
   let adminTrips = [];
 
@@ -262,21 +302,33 @@ async function renderAdminPackages() {
   if (dbConfig.enabled && dbConfig.url && dbConfig.anonKey) {
     try {
       adminTrips = await loadTripsFromSupabase(dbConfig);
-    } catch (error) {
+      if (adminTrips.length) {
+        saveTripsCache(adminTrips);
+      }
+    } catch {
       adminTrips = [];
     }
   }
 
   if (!adminTrips.length) {
-    adminTrips = loadAdminTrips(adminData);
+    adminTrips = loadTripsCache();
   }
 
-  if (!adminTrips.length) return;
+  if (!adminTrips.length) {
+    adminTrips = loadAdminTrips(adminData);
+    if (adminTrips.length) {
+      saveTripsCache(adminTrips);
+    }
+  }
+
+  if (!adminTrips.length) {
+    grid.innerHTML = '<p class="empty-row">Trip package belum tersedia. Silakan tambah dari admin lalu push/pull data.</p>';
+    return;
+  }
   const columns = Number(layout?.packageGrid?.columns || 4);
   const rows = Number(layout?.packageGrid?.rows || 2);
   const total = Math.max(1, columns) * Math.max(1, rows);
 
-  grid.innerHTML = '';
   grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
   adminTrips.slice(0, total).forEach((trip) => grid.appendChild(createPackageCard(trip)));
 }
