@@ -38,6 +38,7 @@ const defaultLayout = {
     { id: 'blog', label: 'Blog', enabled: true, caption: 'Travel Tips', title: 'Travel Guide & Tips for Ijen Bromo', text: '' },
     { id: 'faq', label: 'FAQ', enabled: true, caption: 'Questions?', title: 'Frequently Asked Questions about Ijen Bromo Tour', text: '' },
   ],
+  destinationItems: [],
   whyChooseItems: [
     { id: crypto.randomUUID(), title: 'Local expert guides', text: 'Trust experienced guides who know the trails, culture, and hidden viewpoints.', enabled: true },
     { id: crypto.randomUUID(), title: 'Affordable pricing', text: 'Get great value with transparent package pricing and no hidden costs.', enabled: true },
@@ -57,31 +58,39 @@ const defaultLayout = {
 const homepageDefaultDestinations = [
   {
     id: 'homepage-destination-1',
+    slug: 'mount-ijen',
     name: 'Mount Ijen',
     summary: 'Blue fire trek and sunrise adventure near the crater lake.',
     image: 'https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?auto=format&fit=crop&w=800&q=80',
     status: 'Active',
+    enabled: true,
   },
   {
     id: 'homepage-destination-2',
+    slug: 'mount-bromo',
     name: 'Mount Bromo',
     summary: 'Volcanic sunrise viewpoints and jeep routes across the sea of sand.',
     image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
     status: 'Active',
+    enabled: true,
   },
   {
     id: 'homepage-destination-3',
+    slug: 'tumpak-sewu-waterfall',
     name: 'Tumpak Sewu Waterfall',
     summary: 'A dramatic curtain waterfall with lush canyon scenery.',
     image: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=800&q=80',
     status: 'Active',
+    enabled: true,
   },
   {
     id: 'homepage-destination-4',
+    slug: 'madakaripura',
     name: 'Madakaripura',
     summary: 'Hidden canyon waterfall and one of East Java’s iconic nature spots.',
     image: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=800&q=80',
     status: 'Active',
+    enabled: true,
   },
 ];
 
@@ -278,13 +287,20 @@ function loadStorage() {
           ...defaultLayout.destinationGrid,
           ...(parsed?.layout?.destinationGrid || {}),
         },
+        destinationItems: Array.isArray(parsed?.layout?.destinationItems) ? parsed.layout.destinationItems : defaultLayout.destinationItems,
         headerMenu: Array.isArray(parsed?.layout?.headerMenu) ? parsed.layout.headerMenu : defaultLayout.headerMenu,
         footerMenu: Array.isArray(parsed?.layout?.footerMenu) ? parsed.layout.footerMenu : defaultLayout.footerMenu,
         sections: Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : defaultLayout.sections,
         whyChooseItems: Array.isArray(parsed?.layout?.whyChooseItems) ? parsed.layout.whyChooseItems : defaultLayout.whyChooseItems,
         faqItems: Array.isArray(parsed?.layout?.faqItems) ? parsed.layout.faqItems : defaultLayout.faqItems,
       },
-      destinations: Array.isArray(parsed?.destinations) ? parsed.destinations : defaultState.destinations,
+      destinations: Array.isArray(parsed?.destinations)
+        ? parsed.destinations.map((destination) => ({
+          ...destination,
+          slug: destination.slug || slugify(destination.name),
+          enabled: destination.enabled !== false,
+        }))
+        : defaultState.destinations,
     };
   } catch {
     return defaultState;
@@ -397,20 +413,24 @@ function normalizeTripForDb(trip) {
 function mapDestinationRowToState(row) {
   return {
     id: row.id,
+    slug: slugify(row.slug || row.name || ''),
     name: row.name || '',
     summary: row.summary || '',
     image: row.image || '',
     status: row.status || 'Active',
+    enabled: row.enabled !== false,
   };
 }
 
 function normalizeDestinationForDb(destination) {
   return {
     id: destination.id,
+    slug: slugify(destination.slug || destination.name),
     name: destination.name || '',
     summary: destination.summary || '',
     image: destination.image || '',
     status: destination.status || 'Active',
+    enabled: destination.enabled !== false,
     updated_at: new Date().toISOString(),
   };
 }
@@ -487,7 +507,7 @@ async function pullRemoteData(config) {
       .order('updated_at', { ascending: false }),
     supabase
       .from('destinations')
-      .select('id,name,summary,image,status,updated_at')
+      .select('id,slug,name,summary,image,status,enabled,updated_at')
       .order('updated_at', { ascending: false }),
     supabase
       .from('site_settings')
@@ -769,7 +789,9 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
               <tr>
                 <th>Photo</th>
                 <th>Destination</th>
+                <th>Slug</th>
                 <th>Description</th>
+                <th>Visible</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -783,7 +805,9 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
                     </div>
                   </td>
                   <td>{item.name}</td>
+                  <td>{item.slug || slugify(item.name)}</td>
                   <td>{item.summary}</td>
+                  <td>{item.enabled !== false ? 'Show' : 'Hide'}</td>
                   <td>{item.status}</td>
                   <td>
                     <div className="action-group">
@@ -795,7 +819,7 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
               ))}
               {data.destinations.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="empty-row">No destinations available yet.</td>
+                  <td colSpan="7" className="empty-row">No destinations available yet.</td>
                 </tr>
               )}
             </tbody>
@@ -1289,10 +1313,12 @@ function TripForm({ existing, onSave, onCancel }) {
 function DestinationForm({ existing, onSave, onCancel }) {
   const emptyDestination = {
     id: crypto.randomUUID(),
+    slug: '',
     name: '',
     summary: '',
     image: '',
     status: 'Active',
+    enabled: true,
   };
 
   const [form, setForm] = useState(existing || emptyDestination);
@@ -1329,10 +1355,21 @@ function DestinationForm({ existing, onSave, onCancel }) {
               <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} required />
             </label>
             <label>
+              Slug URL
+              <input value={form.slug || ''} onChange={(e) => setForm((prev) => ({ ...prev, slug: slugify(e.target.value) }))} placeholder="auto from name" />
+            </label>
+            <label>
               Status
               <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}>
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
+              </select>
+            </label>
+            <label>
+              Show on homepage
+              <select value={form.enabled ? 'yes' : 'no'} onChange={(e) => setForm((prev) => ({ ...prev, enabled: e.target.value === 'yes' }))}>
+                <option value="yes">Show</option>
+                <option value="no">Hide</option>
               </select>
             </label>
           </div>
@@ -1359,12 +1396,29 @@ function DestinationForm({ existing, onSave, onCancel }) {
   );
 }
 
-function LayoutView({ layout, onSave, onNotify }) {
+function LayoutView({ layout, destinations, onSave, onNotify }) {
   const [form, setForm] = useState(layout || defaultLayout);
 
   useEffect(() => {
     setForm(layout || defaultLayout);
   }, [layout]);
+
+  useEffect(() => {
+    const sourceItems = Array.isArray(destinations) ? destinations : [];
+    setForm((prev) => {
+      const existing = Array.isArray(prev.destinationItems) ? prev.destinationItems : [];
+      const merged = sourceItems.map((destination) => {
+        const matched = existing.find((item) => item.id === destination.id);
+        return {
+          id: destination.id,
+          label: destination.name || destination.slug || 'Destination',
+          enabled: matched ? matched.enabled !== false : destination.enabled !== false,
+        };
+      });
+      const unchanged = existing.filter((item) => !sourceItems.some((destination) => destination.id === item.id));
+      return { ...prev, destinationItems: [...merged, ...unchanged] };
+    });
+  }, [destinations]);
 
   const updateGrid = (key, value) => {
     const num = Number(value);
@@ -1374,6 +1428,27 @@ function LayoutView({ layout, onSave, onNotify }) {
         ...prev.packageGrid,
         [key]: Number.isNaN(num) ? prev.packageGrid[key] : Math.max(1, Math.min(4, num)),
       },
+    }));
+  };
+
+  const updateDestinationItem = (id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      destinationItems: (prev.destinationItems || []).map((item) => (item.id === id ? { ...item, [key]: value } : item)),
+    }));
+  };
+
+  const addDestinationItem = () => {
+    setForm((prev) => ({
+      ...prev,
+      destinationItems: [...(prev.destinationItems || []), { id: crypto.randomUUID(), label: 'New Destination', enabled: true }],
+    }));
+  };
+
+  const removeDestinationItem = (id) => {
+    setForm((prev) => ({
+      ...prev,
+      destinationItems: (prev.destinationItems || []).filter((item) => item.id !== id),
     }));
   };
 
@@ -1607,6 +1682,27 @@ function LayoutView({ layout, onSave, onNotify }) {
               />
             </label>
           </div>
+        </div>
+
+        <div className="form-section">
+          <h3>Destination Items</h3>
+          {(form.destinationItems || []).map((item) => (
+            <div key={item.id} className="form-grid-2" style={{ marginBottom: 12 }}>
+              <label>
+                Label
+                <input value={item.label || ''} onChange={(e) => updateDestinationItem(item.id, 'label', e.target.value)} />
+              </label>
+              <label>
+                Show on homepage
+                <select value={item.enabled ? 'yes' : 'no'} onChange={(e) => updateDestinationItem(item.id, 'enabled', e.target.value === 'yes')}>
+                  <option value="yes">Show</option>
+                  <option value="no">Hide</option>
+                </select>
+              </label>
+              <button type="button" className="text-btn text-btn-danger" onClick={() => removeDestinationItem(item.id)}>Delete item</button>
+            </div>
+          ))}
+          <button type="button" className="secondary-btn" onClick={addDestinationItem}>+ Add destination item</button>
         </div>
 
         <div className="form-section">
@@ -1935,11 +2031,17 @@ function App() {
   };
 
   const handleSaveDestination = (destination, isUpdate) => {
+    const normalizedDestination = {
+      ...destination,
+      slug: slugify(destination.slug || destination.name),
+      enabled: destination.enabled !== false,
+    };
+
     setData((prev) => ({
       ...prev,
       destinations: isUpdate
-        ? prev.destinations.map((item) => (item.id === destination.id ? destination : item))
-        : [destination, ...prev.destinations],
+        ? prev.destinations.map((item) => (item.id === normalizedDestination.id ? normalizedDestination : item))
+        : [normalizedDestination, ...prev.destinations],
     }));
   };
 
@@ -2073,7 +2175,10 @@ function App() {
       notify('Homepage destinations are already imported.', 'success');
       return;
     }
-    setData((prev) => ({ ...prev, destinations: [...newDestinations, ...prev.destinations] }));
+    setData((prev) => ({
+      ...prev,
+      destinations: [...newDestinations.map((item) => ({ ...item, slug: slugify(item.name), enabled: true })), ...prev.destinations],
+    }));
     notify(`${newDestinations.length} destination(s) imported. Click "Push to Supabase" to sync.`, 'success');
   };
 
@@ -2144,7 +2249,7 @@ function App() {
       );
     }
     if (activePage === 'layout') {
-      return <LayoutView layout={data.layout} onSave={handleSaveLayout} onNotify={notify} />;
+      return <LayoutView layout={data.layout} destinations={data.destinations} onSave={handleSaveLayout} onNotify={notify} />;
     }
     if (activePage === 'services') {
       return <ServicesView data={data} onSave={handleSaveService} onDelete={handleDeleteService} onNotify={notify} />;

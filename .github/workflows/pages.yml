@@ -44,7 +44,7 @@ jobs:
         run: |
           rm -rf site
           mkdir -p site/admin
-          cp index.html trip.html styles.css script.js homepage-data.js trip-detail.js site/
+          cp index.html trip.html destination.html styles.css script.js homepage-data.js trip-detail.js destination-detail.js site/
           cp -r admin/dist/* site/admin/
           echo "" > site/.nojekyll
 

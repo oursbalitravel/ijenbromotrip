@@ -77,7 +77,7 @@ async function loadTripsFromSupabase(config) {
 async function loadDestinationsFromSupabase(config) {
   if (!config.enabled || !config.url || !config.anonKey) return [];
 
-  const endpoint = `${config.url}/rest/v1/destinations?select=id,name,summary,image,status&order=updated_at.desc`;
+  const endpoint = `${config.url}/rest/v1/destinations?select=id,slug,name,summary,image,status,enabled&order=updated_at.desc`;
   const response = await fetch(endpoint, {
     headers: {
       apikey: config.anonKey,
@@ -92,10 +92,12 @@ async function loadDestinationsFromSupabase(config) {
 
   return rows.map((row) => ({
     id: row.id,
+    slug: slugify(row.slug || row.name || ''),
     name: row.name || '',
     summary: row.summary || '',
     image: row.image || '',
     status: row.status || 'Active',
+    enabled: row.enabled !== false,
   }));
 }
 
@@ -290,7 +292,12 @@ function renderDestinations(layout, destinations) {
   const grid = document.querySelector('#destinations .dest-grid');
   if (!grid) return;
 
-  const activeItems = items.filter((item) => (item.status || 'Active') === 'Active');
+  const destinationItems = Array.isArray(layout?.destinationItems) ? layout.destinationItems : [];
+  const visibilityById = new Map(destinationItems.map((item) => [item.id, item.enabled !== false]));
+  const activeItems = items.filter((item) => {
+    const sectionVisible = visibilityById.has(item.id) ? visibilityById.get(item.id) : true;
+    return sectionVisible && item.enabled !== false && (item.status || 'Active') === 'Active';
+  });
   grid.innerHTML = '';
   const columns = Number(layout?.destinationGrid?.columns || 4);
   const rows = Number(layout?.destinationGrid?.rows || 1);
@@ -309,7 +316,7 @@ function renderDestinations(layout, destinations) {
     card.innerHTML = `
       <img src="${item.image || 'https://via.placeholder.com/800x600?text=Destination'}" alt="${item.name || 'Destination'}" />
       <div>
-        <h3>${item.name || 'Destination'}</h3>
+        <h3><a href="destination.html?slug=${encodeURIComponent(item.slug || slugify(item.name))}">${item.name || 'Destination'}</a></h3>
       </div>
     `;
     grid.appendChild(card);

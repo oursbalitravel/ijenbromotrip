@@ -65,10 +65,12 @@ create table if not exists public.services (
 
 create table if not exists public.destinations (
    id text primary key,
+   slug text not null default '',
    name text not null,
    summary text not null default '',
    image text not null default '',
    status text not null default 'Active',
+   enabled boolean not null default true,
    updated_at timestamptz not null default now()
 );
 
