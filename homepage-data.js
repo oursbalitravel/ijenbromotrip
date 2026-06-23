@@ -77,7 +77,7 @@ async function loadTripsFromSupabase(config) {
 async function loadDestinationsFromSupabase(config) {
   if (!config.enabled || !config.url || !config.anonKey) return [];
 
-  const endpoint = `${config.url}/rest/v1/destinations?select=id,slug,name,summary,image,status,enabled&order=updated_at.desc`;
+  const endpoint = `${config.url}/rest/v1/destinations?select=id,slug,name,summary,description,image,images,highlights,faqs,status,enabled&order=updated_at.desc`;
   const response = await fetch(endpoint, {
     headers: {
       apikey: config.anonKey,
@@ -95,7 +95,11 @@ async function loadDestinationsFromSupabase(config) {
     slug: slugify(row.slug || row.name || ''),
     name: row.name || '',
     summary: row.summary || '',
+    description: row.description || '',
     image: row.image || '',
+    images: Array.isArray(row.images) ? row.images : [],
+    highlights: Array.isArray(row.highlights) ? row.highlights : [],
+    faqs: Array.isArray(row.faqs) ? row.faqs : [],
     status: row.status || 'Active',
     enabled: row.enabled !== false,
   }));

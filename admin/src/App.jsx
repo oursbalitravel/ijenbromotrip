@@ -515,7 +515,7 @@ async function pullRemoteData(config) {
       .order('updated_at', { ascending: false }),
     supabase
       .from('destinations')
-      .select('id,slug,name,summary,image,status,enabled,updated_at')
+      .select('id,slug,name,summary,description,image,images,highlights,faqs,status,enabled,updated_at')
       .order('updated_at', { ascending: false }),
     supabase
       .from('site_settings')
@@ -2262,7 +2262,16 @@ function App() {
 
       setData(remote);
       saveStorage(remote);
-      notify('Data pulled from Supabase.', 'success');
+      
+      // Also save to homepage cache keys for instant homepage sync
+      if (remote.trips && remote.trips.length > 0) {
+        localStorage.setItem('ijen-bromo-homepage-trips-cache', JSON.stringify(remote.trips));
+      }
+      if (remote.destinations && remote.destinations.length > 0) {
+        localStorage.setItem('ijen-bromo-homepage-destinations-cache', JSON.stringify(remote.destinations));
+      }
+      
+      notify('Data pulled from Supabase and synced to homepage.', 'success');
     } catch (error) {
       notify(`Failed to pull data from Supabase: ${formatSupabaseError(error)}`, 'error');
     }
