@@ -16,6 +16,22 @@ function slugify(text) {
     .replace(/-+/g, '-') || 'trip-package';
 }
 
+const CURRENCY_OPTIONS = ['IDR', 'USD', 'AUD', 'SGD', 'MYR', 'EUR'];
+
+function formatCurrency(value, currencyCode = 'IDR') {
+  const code = (currencyCode || 'IDR').toUpperCase();
+  try {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'code',
+      maximumFractionDigits: 0,
+    }).format(Number(value || 0));
+  } catch {
+    return `${code} ${Number(value || 0).toLocaleString('id-ID')}`;
+  }
+}
+
 const defaultLayout = {
   packageGrid: { columns: 4, rows: 2 },
   destinationGrid: { columns: 4, rows: 1 },
@@ -784,7 +800,7 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
                   <td>{trip.title}</td>
                   <td>{trip.slug || slugify(trip.title)}</td>
                   <td>{trip.duration}</td>
-                  <td>${trip.price}</td>
+                  <td>{formatCurrency(trip.price, data.settings?.currencyCode)}</td>
                   <td>{trip.status}</td>
                   <td>
                     <div className="action-group">
@@ -853,6 +869,7 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
       {isTripFormOpen && (
         <TripForm
           existing={tripFormData}
+          currencyCode={data.settings?.currencyCode || 'IDR'}
           onSave={(trip, isUpdate) => {
             onSaveTrip(trip, isUpdate);
             setIsTripFormOpen(false);
@@ -914,7 +931,7 @@ function ServicesView({ data, onSave, onDelete, onNotify }) {
               <tr key={item.id}>
                 <td>{item.name}</td>
                 <td>{item.type}</td>
-                <td>${item.price}</td>
+                <td>{formatCurrency(item.price, data.settings?.currencyCode)}</td>
                 <td>{item.status}</td>
                 <td>
                   <div className="action-group">
@@ -935,6 +952,7 @@ function ServicesView({ data, onSave, onDelete, onNotify }) {
       {isFormOpen && (
         <ServiceForm
           existing={service}
+          currencyCode={data.settings?.currencyCode || 'IDR'}
           onSave={(item, isUpdate) => {
             onSave(item, isUpdate);
             setIsFormOpen(false);
@@ -1005,7 +1023,11 @@ function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPul
             </label>
             <label>
               Currency Code
-              <input value={form.currencyCode || 'IDR'} onChange={(e) => handleChange('currencyCode', e.target.value.toUpperCase())} placeholder="IDR" maxLength={3} />
+              <select value={form.currencyCode || 'IDR'} onChange={(e) => handleChange('currencyCode', e.target.value)}>
+                {CURRENCY_OPTIONS.map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
             </label>
             <label>
               WhatsApp Message Prefix
@@ -1013,7 +1035,7 @@ function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPul
                 rows="3"
                 value={form.whatsappMessagePrefix || ''}
                 onChange={(e) => handleChange('whatsappMessagePrefix', e.target.value)}
-                placeholder="Halo, saya ingin booking trip ini: "
+                placeholder="Halo, saya ingin booking trip ini: [{title}] [{url}]"
               />
             </label>
             <label>
@@ -1029,7 +1051,7 @@ function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPul
                 rows="3"
                 value={form.whatsappMessageSuffix || ''}
                 onChange={(e) => handleChange('whatsappMessageSuffix', e.target.value)}
-                placeholder=""
+                placeholder="Contoh: Hubungi kami sekarang."
               />
             </label>
             <label className="logo-upload">
@@ -1087,7 +1109,7 @@ function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPul
   );
 }
 
-function TripForm({ existing, onSave, onCancel }) {
+function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
   const emptyTrip = {
     id: crypto.randomUUID(),
     slug: '',
@@ -1260,6 +1282,7 @@ function TripForm({ existing, onSave, onCancel }) {
               <label>
                 Base Price
                 <input type="number" value={form.price} onChange={(e) => update('price', Number(e.target.value))} required />
+                <small className="label-note">Preview: {formatCurrency(form.price, currencyCode)}</small>
               </label>
               <label>
                 Discount (%)
@@ -2017,7 +2040,7 @@ function LayoutView({ layout, destinations, onSave, onNotify }) {
   );
 }
 
-function ServiceForm({ existing, onSave, onCancel }) {
+function ServiceForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
   const emptyService = { id: crypto.randomUUID(), name: '', type: 'Per Pax', price: 0, status: 'Active' };
   const [form, setForm] = useState(existing || emptyService);
 
@@ -2056,6 +2079,7 @@ function ServiceForm({ existing, onSave, onCancel }) {
             <label>
               Price
               <input type="number" value={form.price} onChange={(e) => setForm((p) => ({ ...p, price: Number(e.target.value) }))} required />
+              <small className="label-note">Preview: {formatCurrency(form.price, currencyCode)}</small>
             </label>
             <label>
               Status

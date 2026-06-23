@@ -221,6 +221,7 @@ with check (id = 'main');
 - `WhatsApp Booking Number` memakai field phone yang sama di setup.
 - `Currency Code` dipakai untuk semua tampilan harga di web.
 - `WhatsApp Message Prefix`, `WhatsApp URL Position`, dan `WhatsApp Message Suffix` mengatur teks order otomatis ke WhatsApp.
+- Token yang didukung di pesan booking: `[{url}]`, `[{title}]`, dan `[{slug}]`.
 
 Catatan:
 - Homepage akan membaca koneksi database dari setup admin (`ijen-bromo-db-config`) sehingga cukup setup sekali di admin.

@@ -37,13 +37,31 @@ function normalizePhone(phone) {
   return (phone || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
 }
 
-function buildWhatsAppMessage(settings, pageUrl) {
-  const prefix = settings.whatsappMessagePrefix || 'Halo, saya ingin booking trip ini: ';
-  const suffix = settings.whatsappMessageSuffix || '';
-  const url = pageUrl || window.location.href;
+function renderBookingTemplate(text, pageUrl, title) {
+  return String(text || '')
+    .replace(/\[\{url\}\]/gi, pageUrl)
+    .replace(/\[\{title\}\]/gi, title)
+    .replace(/\[\{slug\}\]/gi, '')
+    .trim();
+}
+
+function buildWhatsAppMessage(settings, pageUrl, title = document.title || 'Ijen Bromo Trip') {
+  const prefixTemplate = settings.whatsappMessagePrefix || 'Halo, saya ingin booking trip ini: ';
+  const suffixTemplate = settings.whatsappMessageSuffix || '';
+  const hasTokens = /\[\{(?:url|title|slug)\}\]/i.test(prefixTemplate) || /\[\{(?:url|title|slug)\}\]/i.test(suffixTemplate);
+
+  if (hasTokens) {
+    return [
+      renderBookingTemplate(prefixTemplate, pageUrl, title),
+      renderBookingTemplate(suffixTemplate, pageUrl, title),
+    ].filter(Boolean).join(' ').trim();
+  }
+
+  const prefix = renderBookingTemplate(prefixTemplate, pageUrl, title);
+  const suffix = renderBookingTemplate(suffixTemplate, pageUrl, title);
   const ordered = (settings.whatsappUrlPosition || 'after') === 'before'
-    ? [url, prefix, suffix]
-    : [prefix, url, suffix];
+    ? [pageUrl, prefix, suffix]
+    : [prefix, pageUrl, suffix];
 
   return ordered.map((part) => String(part || '').trim()).filter(Boolean).join(' ');
 }
@@ -54,7 +72,9 @@ function applyWhatsAppLinks() {
   if (!phone) return;
 
   document.querySelectorAll('[data-wa-link], a[href^="mailto:"]').forEach((link) => {
-    const message = encodeURIComponent(buildWhatsAppMessage(settings, window.location.href));
+    const title = link.getAttribute('data-wa-title') || document.title || 'Ijen Bromo Trip';
+    const pageUrl = link.getAttribute('data-wa-url') || window.location.href;
+    const message = encodeURIComponent(buildWhatsAppMessage(settings, pageUrl, title));
     link.href = `https://wa.me/${phone}?text=${message}`;
     link.target = '_blank';
     link.rel = 'noreferrer';

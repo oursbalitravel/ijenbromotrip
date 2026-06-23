@@ -120,9 +120,32 @@ function normalizePhone(phone) {
   return (phone || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
 }
 
-function buildWhatsAppMessage(settings, pageUrl) {
-  const prefix = settings?.whatsappMessagePrefix || 'Halo, saya ingin booking trip ini: ';
-  const suffix = settings?.whatsappMessageSuffix || '';
+function renderBookingTemplate(text, trip, pageUrl) {
+  const title = trip?.title || 'Trip package';
+  const slug = trip?.slug || slugify(title);
+  const url = pageUrl || window.location.href;
+
+  return String(text || '')
+    .replace(/\[\{url\}\]/gi, url)
+    .replace(/\[\{title\}\]/gi, title)
+    .replace(/\[\{slug\}\]/gi, slug)
+    .trim();
+}
+
+function buildWhatsAppMessage(settings, trip, pageUrl) {
+  const prefixTemplate = settings?.whatsappMessagePrefix || 'Halo, saya ingin booking trip ini: ';
+  const suffixTemplate = settings?.whatsappMessageSuffix || '';
+  const hasTokens = /\[\{(?:url|title|slug)\}\]/i.test(prefixTemplate) || /\[\{(?:url|title|slug)\}\]/i.test(suffixTemplate);
+
+  if (hasTokens) {
+    return [
+      renderBookingTemplate(prefixTemplate, trip, pageUrl),
+      renderBookingTemplate(suffixTemplate, trip, pageUrl),
+    ].filter(Boolean).join(' ').trim();
+  }
+
+  const prefix = renderBookingTemplate(prefixTemplate, trip, pageUrl);
+  const suffix = renderBookingTemplate(suffixTemplate, trip, pageUrl);
   const url = pageUrl || window.location.href;
   const ordered = (settings?.whatsappUrlPosition || 'after') === 'before'
     ? [url, prefix, suffix]
@@ -131,10 +154,10 @@ function buildWhatsAppMessage(settings, pageUrl) {
   return ordered.map((part) => String(part || '').trim()).filter(Boolean).join(' ');
 }
 
-function buildOrderLink(settings) {
+function buildOrderLink(settings, trip) {
   const phone = normalizePhone(settings?.phone || '');
   if (!phone) return '#overview';
-  const message = encodeURIComponent(buildWhatsAppMessage(settings, window.location.href));
+  const message = encodeURIComponent(buildWhatsAppMessage(settings, trip, window.location.href));
   return `https://wa.me/${phone}?text=${message}`;
 }
 
@@ -209,7 +232,7 @@ function renderTrip(trip) {
     { id: 'cost', label: 'Cost' },
     { id: 'know-before-you-go', label: 'Know before you go' },
   ];
-  const orderLink = buildOrderLink(settings);
+  const orderLink = buildOrderLink(settings, trip);
 
   root.innerHTML = `
     <article class="trip-detail-shell">
