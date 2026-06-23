@@ -37,9 +37,9 @@ function resolveSupabaseConfig() {
 }
 
 async function loadTripsFromSupabase(config) {
-  if (!config.url || !config.anonKey) return [];
+  if (!config.enabled || !config.url || !config.anonKey) return [];
 
-  const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs&order=updated_at.desc`;
+  const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,cover_image,images,highlights,itinerary,faqs&order=updated_at.desc`;
   const response = await fetch(endpoint, {
     headers: {
       apikey: config.anonKey,
@@ -67,6 +67,7 @@ async function loadTripsFromSupabase(config) {
     price: Number(row.price ?? 0),
     discount: Number(row.discount ?? 0),
     status: row.status || 'Active',
+    coverImage: row.cover_image || '',
     images: Array.isArray(row.images) ? row.images : [],
     highlights: Array.isArray(row.highlights) ? row.highlights : [],
     itinerary: Array.isArray(row.itinerary) ? row.itinerary : [],
@@ -105,6 +106,39 @@ async function loadDestinationsFromSupabase(config) {
   }));
 }
 
+async function loadSiteConfigFromSupabase(config) {
+  if (!config.enabled || !config.url || !config.anonKey) return null;
+
+  const endpoint = `${config.url}/rest/v1/site_settings?select=id,company_name,address,phone,email,currency_code,whatsapp_message_prefix,whatsapp_message_suffix,whatsapp_url_position,logo,layout_json&id=eq.main&limit=1`;
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+    },
+  });
+
+  if (!response.ok) return null;
+
+  const rows = await response.json();
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) return null;
+
+  return {
+    settings: {
+      companyName: row.company_name || '',
+      address: row.address || '',
+      phone: row.phone || '',
+      email: row.email || '',
+      currencyCode: String(row.currency_code || 'IDR').trim().toUpperCase(),
+      whatsappMessagePrefix: row.whatsapp_message_prefix || 'Halo, saya ingin booking trip ini: ',
+      whatsappMessageSuffix: row.whatsapp_message_suffix || '',
+      whatsappUrlPosition: row.whatsapp_url_position === 'before' ? 'before' : 'after',
+      logo: row.logo || '',
+    },
+    layout: row.layout_json && typeof row.layout_json === 'object' ? row.layout_json : {},
+  };
+}
+
 function loadAdminData() {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
@@ -117,12 +151,17 @@ function loadAdminData() {
 }
 
 function loadAdminSettings(adminData) {
-  return adminData?.settings || {
+  const raw = adminData?.settings || {};
+  return {
+    ...raw,
     currencyCode: 'IDR',
-    phone: '',
-    whatsappMessagePrefix: 'Halo, saya ingin booking trip ini: ',
-    whatsappMessageSuffix: '',
-    whatsappUrlPosition: 'after',
+    phone: raw?.phone ? String(raw.phone) : '',
+    whatsappMessagePrefix: raw?.whatsappMessagePrefix
+      ? String(raw.whatsappMessagePrefix)
+      : 'Halo, saya ingin booking trip ini: ',
+    whatsappMessageSuffix: raw?.whatsappMessageSuffix ? String(raw.whatsappMessageSuffix) : '',
+    whatsappUrlPosition: raw?.whatsappUrlPosition === 'before' ? 'before' : 'after',
+    currencyCode: String(raw?.currencyCode || 'IDR').trim().toUpperCase(),
   };
 }
 
@@ -152,7 +191,22 @@ function loadAdminTrips(adminData) {
 }
 
 function resolveLayout(adminData) {
-  return adminData?.layout || {};
+  const raw = adminData?.layout || {};
+  if (raw?.frontPage && typeof raw.frontPage === 'object') {
+    return raw.frontPage;
+  }
+  return raw;
+}
+
+function resolveFrontLayout(siteConfig) {
+  const remoteLayout = siteConfig?.layout || {};
+  if (remoteLayout?.frontPage && typeof remoteLayout.frontPage === 'object') {
+    return remoteLayout.frontPage;
+  }
+  if (Object.keys(remoteLayout).length) {
+    return remoteLayout;
+  }
+  return {};
 }
 
 function saveTripsCache(trips) {
@@ -200,9 +254,11 @@ function loadDestinationsCache() {
 function applyHeaderMenu(layout) {
   const nav = document.querySelector('.nav-menu');
   const menu = Array.isArray(layout?.headerMenu) ? layout.headerMenu : [];
-  if (!nav || !menu.length) return;
+  if (!nav) return;
 
   nav.innerHTML = '';
+  if (!menu.length) return;
+
   menu.forEach((item) => {
     const link = document.createElement('a');
     link.href = item.href || '#hero';
@@ -214,9 +270,11 @@ function applyHeaderMenu(layout) {
 function applyFooterMenu(layout) {
   const links = document.querySelector('.social-links');
   const menu = Array.isArray(layout?.footerMenu) ? layout.footerMenu : [];
-  if (!links || !menu.length) return;
+  if (!links) return;
 
   links.innerHTML = '';
+  if (!menu.length) return;
+
   menu.forEach((item) => {
     const link = document.createElement('a');
     link.href = item.href || '#footer';
@@ -238,7 +296,14 @@ function applyHeroImages(layout) {
 }
 
 function applySectionLayout(layout) {
-  const sections = Array.isArray(layout?.sections) ? layout.sections : [];
+  const sections = (Array.isArray(layout?.sections) ? layout.sections : [])
+    .filter((section) => section && typeof section === 'object')
+    .map((section) => ({
+      ...section,
+      id: String(section.id || ''),
+      enabled: section.enabled !== false,
+    }))
+    .filter((section) => section.id);
   const footerText = document.querySelector('.bottom-footer p');
   if (footerText && layout?.footerText) {
     footerText.textContent = layout.footerText;
@@ -320,7 +385,7 @@ function renderDestinations(layout, destinations) {
   grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
 
   if (!activeItems.length) {
-    grid.innerHTML = '<p class="empty-row">Destination belum tersedia. Silakan import dari homepage atau tambah lewat admin.</p>';
+    grid.innerHTML = '<p class="empty-row">Destination belum tersedia. Silakan isi dari admin lalu push ke database.</p>';
     return;
   }
 
@@ -340,10 +405,19 @@ function renderDestinations(layout, destinations) {
 function renderWhyChoose(layout) {
   const grid = document.querySelector('#why-us .features-grid');
   const items = Array.isArray(layout?.whyChooseItems) ? layout.whyChooseItems : [];
-  if (!grid || !items.length) return;
+  if (!grid) return;
+
+  grid.innerHTML = '';
+  if (!items.length) {
+    grid.innerHTML = '<p class="empty-row">Section Why Choose Us masih kosong. Silakan isi dari menu Layout di admin.</p>';
+    return;
+  }
 
   const activeItems = items.filter((item) => item.enabled !== false);
-  grid.innerHTML = '';
+  if (!activeItems.length) {
+    grid.innerHTML = '<p class="empty-row">Semua item Why Choose Us sedang disembunyikan dari admin.</p>';
+    return;
+  }
 
   activeItems.forEach((item) => {
     const card = document.createElement('article');
@@ -359,10 +433,19 @@ function renderWhyChoose(layout) {
 function renderFaq(layout) {
   const list = document.querySelector('#faq .faq-list');
   const items = Array.isArray(layout?.faqItems) ? layout.faqItems : [];
-  if (!list || !items.length) return;
+  if (!list) return;
+
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = '<p class="empty-row">FAQ masih kosong. Silakan isi dari menu Layout di admin.</p>';
+    return;
+  }
 
   const activeItems = items.filter((item) => item.enabled !== false);
-  list.innerHTML = '';
+  if (!activeItems.length) {
+    list.innerHTML = '<p class="empty-row">Semua FAQ sedang disembunyikan dari admin.</p>';
+    return;
+  }
 
   activeItems.forEach((item) => {
     const block = document.createElement('details');
@@ -375,7 +458,7 @@ function renderFaq(layout) {
 }
 
 function formatCurrency(value, currencyCode = 'IDR') {
-  const code = (currencyCode || 'IDR').toUpperCase();
+  const code = String(currencyCode || 'IDR').trim().toUpperCase() || 'IDR';
   try {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -389,19 +472,22 @@ function formatCurrency(value, currencyCode = 'IDR') {
 }
 
 function getTripCardImage(trip) {
-  if (!trip) return 'https://via.placeholder.com/600x450?text=Trip';
+  if (!trip) return null;
 
-  const candidates = [trip.coverImage, trip.image, ...(Array.isArray(trip.images) ? trip.images : [])];
+  const candidates = [trip.coverImage];
   const image = candidates.find((item) => typeof item === 'string' && item.trim());
-  return image || 'https://via.placeholder.com/600x450?text=Trip';
+  return image || null;
 }
 
 function createPackageCard(trip, settings) {
+  const image = getTripCardImage(trip);
+  if (!image) return null;
+
   const slug = trip.slug || slugify(trip.title);
   const article = document.createElement('article');
   article.className = 'package-card';
   article.innerHTML = `
-    <img src="${getTripCardImage(trip)}" alt="${trip.title || 'Trip package'}" />
+    <img src="${image}" alt="${trip.title || 'Trip package'}" />
     <div class="card-content">
       <h3>${trip.title || 'Untitled Package'}</h3>
       <p>${trip.overview || trip.description || 'Explore this amazing package with our expert guides.'}</p>
@@ -415,14 +501,81 @@ function createPackageCard(trip, settings) {
   return article;
 }
 
+function renderSetupState(reason) {
+  const titleNode = document.querySelector('.hero-content h1');
+  const textNode = document.querySelector('.hero-copy');
+  const packageGrid = document.getElementById('packages-grid');
+  const destinationGrid = document.querySelector('#destinations .dest-grid');
+  const blogGrid = document.querySelector('#blog .blog-grid');
+  const whyGrid = document.querySelector('#why-us .features-grid');
+  const faqList = document.querySelector('#faq .faq-list');
+
+  if (titleNode) titleNode.textContent = 'Website belum siap tayang';
+  if (textNode) textNode.textContent = 'Lengkapi konten dan layout di Admin Panel, lalu Push ke Supabase untuk menampilkan homepage.';
+
+  if (packageGrid) {
+    packageGrid.innerHTML = `<p class="empty-row">${reason}</p>`;
+  }
+  if (destinationGrid) {
+    destinationGrid.innerHTML = '<p class="empty-row">Destination belum tersedia. Silakan isi dari admin dan push ke database.</p>';
+  }
+  if (blogGrid) {
+    blogGrid.innerHTML = '<p class="empty-row">Konten blog belum diatur dari admin.</p>';
+  }
+  if (whyGrid) {
+    whyGrid.innerHTML = '<p class="empty-row">Section Why Choose Us belum diatur dari admin.</p>';
+  }
+  if (faqList) {
+    faqList.innerHTML = '<p class="empty-row">FAQ belum diatur dari admin.</p>';
+  }
+}
+
 async function renderAdminPackages() {
   const grid = document.getElementById('packages-grid');
   if (!grid) return;
 
   const dbConfig = resolveSupabaseConfig();
   const adminData = loadAdminData();
-  const settings = loadAdminSettings(adminData);
-  const layout = resolveLayout(adminData);
+  let settings = loadAdminSettings(adminData);
+  let layout = resolveLayout(adminData);
+
+  // Clear initial hardcoded cards so homepage never silently falls back to old static content.
+  grid.innerHTML = '';
+
+  let adminTrips = [];
+  let adminDestinations = [];
+
+  if (!dbConfig.enabled || !dbConfig.url || !dbConfig.anonKey) {
+    renderSetupState('Supabase Sync belum aktif. Aktifkan Setup di admin lalu Push data terlebih dahulu.');
+    return;
+  }
+
+  // Keep homepage data source consistent with admin setup: Supabase only when enabled.
+  if (dbConfig.enabled && dbConfig.url && dbConfig.anonKey) {
+    try {
+      const [siteConfig, trips, destinations] = await Promise.all([
+        loadSiteConfigFromSupabase(dbConfig),
+        loadTripsFromSupabase(dbConfig),
+        loadDestinationsFromSupabase(dbConfig),
+      ]);
+
+      if (siteConfig?.settings) {
+        settings = { ...settings, ...siteConfig.settings };
+      }
+      layout = resolveFrontLayout(siteConfig);
+
+      if (!Object.keys(layout).length) {
+        renderSetupState('Layout Front Page belum diset di admin. Buka menu Layout lalu Save dan Push.');
+        return;
+      }
+
+      adminTrips = trips;
+      adminDestinations = destinations;
+    } catch {
+      renderSetupState('Gagal membaca data Supabase. Cek Setup admin dan koneksi database Anda.');
+      return;
+    }
+  }
 
   applyHeaderMenu(layout);
   applyFooterMenu(layout);
@@ -431,55 +584,14 @@ async function renderAdminPackages() {
   renderWhyChoose(layout);
   renderFaq(layout);
 
-  // Clear initial hardcoded cards so homepage never silently falls back to old static content.
-  grid.innerHTML = '';
-
-  let adminTrips = [];
-  let adminDestinations = [];
-
-  // Keep homepage data source consistent with admin setup: Supabase only when enabled.
-  if (dbConfig.enabled && dbConfig.url && dbConfig.anonKey) {
-    try {
-      adminTrips = await loadTripsFromSupabase(dbConfig);
-      adminDestinations = await loadDestinationsFromSupabase(dbConfig);
-      if (adminTrips.length) {
-        saveTripsCache(adminTrips);
-      }
-      if (adminDestinations.length) {
-        saveDestinationsCache(adminDestinations);
-      }
-    } catch {
-      adminTrips = [];
-      adminDestinations = [];
-    }
-  }
-
-  if (!adminTrips.length) {
-    adminTrips = loadTripsCache();
-  }
-
-  if (!adminTrips.length) {
-    adminTrips = loadAdminTrips(adminData);
-    if (adminTrips.length) {
-      saveTripsCache(adminTrips);
-    }
-  }
-
-  if (!adminDestinations.length) {
-    adminDestinations = loadDestinationsCache();
-  }
-
-  if (!adminDestinations.length) {
-    adminDestinations = Array.isArray(adminData?.destinations) ? adminData.destinations : [];
-    if (adminDestinations.length) {
-      saveDestinationsCache(adminDestinations);
-    }
-  }
-
   renderDestinations(layout, adminDestinations);
 
-  if (!adminTrips.length) {
-    grid.innerHTML = '<p class="empty-row">Trip package belum tersedia. Silakan tambah dari admin lalu push/pull data.</p>';
+  const activeTrips = adminTrips
+    .filter((trip) => (trip.status || 'Active') === 'Active')
+    .filter((trip) => Boolean(getTripCardImage(trip)));
+
+  if (!activeTrips.length) {
+    grid.innerHTML = '<p class="empty-row">Trip belum tampil karena data kosong atau Front Image belum diset di admin.</p>';
     return;
   }
   const columns = Number(layout?.packageGrid?.columns || 4);
@@ -487,7 +599,10 @@ async function renderAdminPackages() {
   const total = Math.max(1, columns) * Math.max(1, rows);
 
   grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
-  adminTrips.slice(0, total).forEach((trip) => grid.appendChild(createPackageCard(trip, settings)));
+  activeTrips.slice(0, total).forEach((trip) => {
+    const card = createPackageCard(trip, settings);
+    if (card) grid.appendChild(card);
+  });
 }
 
 window.addEventListener('load', renderAdminPackages);

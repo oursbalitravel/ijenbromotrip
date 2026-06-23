@@ -70,7 +70,7 @@ function loadAdminSettings() {
 
 async function loadTripsFromSupabase(config) {
   if (!config.enabled || !config.url || !config.anonKey) return [];
-  const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs&order=updated_at.desc`;
+  const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,cover_image,images,highlights,itinerary,faqs&order=updated_at.desc`;
   const response = await fetch(endpoint, {
     headers: {
       apikey: config.anonKey,
@@ -95,6 +95,7 @@ async function loadTripsFromSupabase(config) {
     price: Number(row.price ?? 0),
     discount: Number(row.discount ?? 0),
     status: row.status || 'Active',
+    coverImage: row.cover_image || '',
     images: Array.isArray(row.images) ? row.images : [],
     highlights: Array.isArray(row.highlights) ? row.highlights : [],
     itinerary: Array.isArray(row.itinerary) ? row.itinerary : [],
@@ -102,8 +103,34 @@ async function loadTripsFromSupabase(config) {
   }));
 }
 
+async function loadSiteConfigFromSupabase(config) {
+  if (!config.enabled || !config.url || !config.anonKey) return null;
+  const endpoint = `${config.url}/rest/v1/site_settings?select=id,phone,currency_code,whatsapp_message_prefix,whatsapp_message_suffix,whatsapp_url_position,layout_json&id=eq.main&limit=1`;
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+    },
+  });
+  if (!response.ok) return null;
+  const rows = await response.json();
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) return null;
+
+  return {
+    settings: {
+      currencyCode: (row.currency_code || 'IDR').toUpperCase(),
+      phone: row.phone || '',
+      whatsappMessagePrefix: row.whatsapp_message_prefix || 'Halo, saya ingin booking trip ini: ',
+      whatsappMessageSuffix: row.whatsapp_message_suffix || '',
+      whatsappUrlPosition: row.whatsapp_url_position || 'after',
+    },
+    layout: row.layout_json && typeof row.layout_json === 'object' ? row.layout_json : {},
+  };
+}
+
 function formatCurrency(value, currencyCode = 'IDR') {
-  const code = (currencyCode || 'IDR').toUpperCase();
+  const code = String(currencyCode || 'IDR').trim().toUpperCase() || 'IDR';
   try {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -163,7 +190,30 @@ function buildOrderLink(settings, trip) {
 
 function getTripImages(trip) {
   const images = Array.isArray(trip.images) ? trip.images.filter(Boolean) : [];
-  return images.length ? images : ['https://via.placeholder.com/1200x700?text=Trip+Image'];
+  const cover = trip?.coverImage ? [trip.coverImage] : [];
+  const merged = [...cover, ...images.filter((img) => img !== trip?.coverImage)];
+  return merged.length ? merged : ['https://via.placeholder.com/1200x700?text=Trip+Image'];
+}
+
+const defaultTripDetailSections = [
+  { id: 'media', label: 'Media Gallery', enabled: true, caption: 'Gallery', title: 'Trip Gallery', text: '' },
+  { id: 'header', label: 'Trip Header', enabled: true, caption: 'Trip Package', title: '', text: '' },
+  { id: 'meta', label: 'Trip Meta', enabled: true, caption: 'Trip Info', title: 'Trip Information', text: '' },
+  { id: 'overview', label: 'Overview', enabled: true, caption: 'Overview', title: 'Overview', text: '' },
+  { id: 'itinerary', label: 'Itinerary', enabled: true, caption: 'Itinerary', title: 'Itinerary', text: '' },
+  { id: 'cost', label: 'Cost', enabled: true, caption: 'Cost', title: 'Cost', text: '' },
+  { id: 'know-before-you-go', label: 'Highlights', enabled: true, caption: 'Highlights', title: 'Know before you go', text: '' },
+  { id: 'faq', label: 'FAQ', enabled: true, caption: 'FAQ', title: 'FAQ', text: '' },
+  { id: 'sidebar', label: 'Sticky Order Card', enabled: true, caption: 'Order', title: 'Order now', text: '' },
+];
+
+function resolveTripDetailSections(layout) {
+  const raw = layout?.tripDetailSections;
+  if (!Array.isArray(raw) || !raw.length) return defaultTripDetailSections;
+  return raw
+    .filter((section) => section && typeof section === 'object')
+    .map((section) => ({ ...section, id: String(section.id || ''), enabled: section.enabled !== false }))
+    .filter((section) => section.id);
 }
 
 function closePreview(root) {
@@ -217,22 +267,28 @@ function getSlugParam() {
   return slugify(params.get('slug') || '');
 }
 
-function renderTrip(trip) {
+function renderTrip(trip, settings, layout) {
   const root = document.getElementById('trip-detail-root');
   if (!root) return;
-  const settings = loadAdminSettings();
   const images = getTripImages(trip);
   const highlights = Array.isArray(trip.highlights) ? trip.highlights.filter(Boolean) : [];
   const itinerary = Array.isArray(trip.itinerary) ? trip.itinerary : [];
   const faqs = Array.isArray(trip.faqs) ? trip.faqs : [];
   const mainImage = images[0];
-  const sections = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'itinerary', label: 'Itinerary' },
-    { id: 'cost', label: 'Cost' },
-    { id: 'know-before-you-go', label: 'Know before you go' },
-  ];
+  const sectionConfig = resolveTripDetailSections(layout);
+  const sectionMap = new Map(sectionConfig.map((section) => [section.id, section]));
+  const shortcutSections = sectionConfig.filter((section) => ['overview', 'itinerary', 'cost', 'know-before-you-go', 'faq'].includes(section.id) && section.enabled !== false);
   const orderLink = buildOrderLink(settings, trip);
+
+  const overviewSection = sectionMap.get('overview');
+  const itinerarySection = sectionMap.get('itinerary');
+  const costSection = sectionMap.get('cost');
+  const highlightsSection = sectionMap.get('know-before-you-go');
+  const faqSection = sectionMap.get('faq');
+  const metaSection = sectionMap.get('meta');
+  const headerSection = sectionMap.get('header');
+  const mediaSection = sectionMap.get('media');
+  const sidebarSection = sectionMap.get('sidebar');
 
   root.innerHTML = `
     <article class="trip-detail-shell">
@@ -246,6 +302,7 @@ function renderTrip(trip) {
 
       <div class="trip-detail-layout">
         <main class="trip-detail-main">
+          ${mediaSection?.enabled !== false ? `
           <section class="trip-media-grid">
             <button type="button" class="trip-image-trigger trip-media-main-button" data-preview-src="${mainImage}" data-preview-alt="${trip.title || 'Trip'}">
               <img class="trip-media-main" src="${mainImage}" alt="${trip.title || 'Trip'}" />
@@ -258,30 +315,39 @@ function renderTrip(trip) {
               `).join('')}
             </div>
           </section>
+          ` : ''}
 
+          ${headerSection?.enabled !== false ? `
           <section class="trip-detail-head">
-            <p class="section-label">Trip Package</p>
+            <p class="section-label">${headerSection?.caption || 'Trip Package'}</p>
             <h1>${trip.title || 'Untitled Trip'}</h1>
-            <p>${trip.overview || trip.description || ''}</p>
+            <p>${headerSection?.text || trip.overview || trip.description || ''}</p>
             <div class="trip-detail-shortcuts" aria-label="Section shortcuts">
-              ${sections.map((section) => `<a class="trip-shortcut-link" href="#${section.id}">${section.label}</a>`).join('')}
+              ${shortcutSections.map((section) => `<a class="trip-shortcut-link" href="#${section.id}">${section.label || section.id}</a>`).join('')}
             </div>
           </section>
+          ` : ''}
 
+          ${metaSection?.enabled !== false ? `
           <section class="trip-detail-meta">
             <div><strong>Duration</strong><span>${trip.duration || '-'}</span></div>
             <div><strong>Group Size</strong><span>${trip.groupSize || '-'}</span></div>
             <div><strong>Vehicle</strong><span>${trip.vehicle || '-'}</span></div>
             <div><strong>Best Time</strong><span>${trip.bestTime || '-'}</span></div>
           </section>
+          ` : ''}
 
+          ${overviewSection?.enabled !== false ? `
           <section class="trip-detail-body" id="overview">
-            <h2>Overview</h2>
+            <h2>${overviewSection?.title || 'Overview'}</h2>
             <p>${trip.description || 'No description yet.'}</p>
+            ${overviewSection?.text ? `<p>${overviewSection.text}</p>` : ''}
           </section>
+          ` : ''}
 
+          ${itinerarySection?.enabled !== false ? `
           <section class="trip-detail-body" id="itinerary">
-            <h2>Itinerary</h2>
+            <h2>${itinerarySection?.title || 'Itinerary'}</h2>
             <div class="trip-itinerary-list">
               ${itinerary.length ? itinerary.map((day) => `
                 <div class="trip-itinerary-day">
@@ -292,13 +358,16 @@ function renderTrip(trip) {
                 </div>
               `).join('') : '<p>No itinerary available.</p>'}
             </div>
+            ${itinerarySection?.text ? `<p>${itinerarySection.text}</p>` : ''}
           </section>
+          ` : ''}
 
+          ${costSection?.enabled !== false ? `
           <section class="trip-detail-body" id="cost">
-            <h2>Cost</h2>
+            <h2>${costSection?.title || 'Cost'}</h2>
             <div class="trip-cost-inline">
               <div>
-                <p class="section-label">From</p>
+                <p class="section-label">${costSection?.caption || 'From'}</p>
                 <strong>${formatCurrency(trip.price, settings.currencyCode)}</strong>
               </div>
               <div>
@@ -306,24 +375,32 @@ function renderTrip(trip) {
                 <strong>${Number(trip.discount || 0) ? `${trip.discount}%` : '-'}</strong>
               </div>
             </div>
-            <p class="trip-cost-note">Price shown is for reference and can change based on availability.</p>
+            <p class="trip-cost-note">${costSection?.text || 'Price shown is for reference and can change based on availability.'}</p>
           </section>
+          ` : ''}
 
+          ${highlightsSection?.enabled !== false ? `
           <section class="trip-detail-body" id="know-before-you-go">
-            <h2>Know before you go</h2>
+            <h2>${highlightsSection?.title || 'Know before you go'}</h2>
             <ul>
               ${highlights.length ? highlights.map((item) => `<li>${item}</li>`).join('') : '<li>No highlights yet.</li>'}
             </ul>
+            ${highlightsSection?.text ? `<p>${highlightsSection.text}</p>` : ''}
           </section>
+          ` : ''}
 
+          ${faqSection?.enabled !== false ? `
           <section class="trip-detail-body" id="faq">
-            <h2>FAQ</h2>
+            <h2>${faqSection?.title || 'FAQ'}</h2>
             <div class="faq-list">
               ${faqs.length ? faqs.map((faq) => `<details><summary>${faq.question || 'Question'}</summary><p>${faq.answer || ''}</p></details>`).join('') : '<p>No FAQs yet.</p>'}
             </div>
+            ${faqSection?.text ? `<p>${faqSection.text}</p>` : ''}
           </section>
+          ` : ''}
         </main>
 
+        ${sidebarSection?.enabled !== false ? `
         <aside class="trip-detail-sidebar">
           <div class="trip-sticky-card">
             <div class="trip-sticky-price-header">
@@ -345,6 +422,7 @@ function renderTrip(trip) {
             <p class="trip-contact-note">Hi, we are ready to help you order this trip package.</p>
           </div>
         </aside>
+        ` : ''}
       </div>
 
       <div class="trip-image-preview-modal" data-preview-modal aria-hidden="true">
@@ -376,10 +454,15 @@ async function bootTripPage() {
   const slug = getSlugParam();
   const config = resolveConfig();
 
-  let trips = await loadTripsFromSupabase(config);
-  if (!trips.length) {
-    trips = loadAdminTrips();
+  if (!config.enabled || !config.url || !config.anonKey) {
+    renderNotFound();
+    return;
   }
+
+  const [trips, siteConfig] = await Promise.all([
+    loadTripsFromSupabase(config),
+    loadSiteConfigFromSupabase(config),
+  ]);
 
   const trip = trips.find((item) => (item.slug || slugify(item.title)) === slug);
   if (!trip) {
@@ -387,7 +470,9 @@ async function bootTripPage() {
     return;
   }
 
-  renderTrip(trip);
+  const settings = siteConfig?.settings || loadAdminSettings();
+  const layout = siteConfig?.layout || {};
+  renderTrip(trip, settings, layout);
 }
 
 window.addEventListener('load', bootTripPage);

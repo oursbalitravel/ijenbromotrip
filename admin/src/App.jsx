@@ -16,10 +16,34 @@ function slugify(text) {
     .replace(/-+/g, '-') || 'trip-package';
 }
 
+function normalizeLayout(layout) {
+  const source = layout || {};
+  return {
+    ...defaultLayout,
+    ...source,
+    packageGrid: {
+      ...defaultLayout.packageGrid,
+      ...(source.packageGrid || {}),
+    },
+    destinationGrid: {
+      ...defaultLayout.destinationGrid,
+      ...(source.destinationGrid || {}),
+    },
+    destinationItems: Array.isArray(source.destinationItems) ? source.destinationItems : defaultLayout.destinationItems,
+    headerMenu: Array.isArray(source.headerMenu) ? source.headerMenu : defaultLayout.headerMenu,
+    footerMenu: Array.isArray(source.footerMenu) ? source.footerMenu : defaultLayout.footerMenu,
+    sections: Array.isArray(source.sections) ? source.sections : defaultLayout.sections,
+    tripDetailSections: Array.isArray(source.tripDetailSections) ? source.tripDetailSections : defaultLayout.tripDetailSections,
+    destinationDetailSections: Array.isArray(source.destinationDetailSections) ? source.destinationDetailSections : defaultLayout.destinationDetailSections,
+    whyChooseItems: Array.isArray(source.whyChooseItems) ? source.whyChooseItems : defaultLayout.whyChooseItems,
+    faqItems: Array.isArray(source.faqItems) ? source.faqItems : defaultLayout.faqItems,
+  };
+}
+
 const CURRENCY_OPTIONS = ['IDR', 'USD', 'AUD', 'SGD', 'MYR', 'EUR'];
 
 function formatCurrency(value, currencyCode = 'IDR') {
-  const code = (currencyCode || 'IDR').toUpperCase();
+  const code = String(currencyCode || 'IDR').trim().toUpperCase() || 'IDR';
   try {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -55,6 +79,25 @@ const defaultLayout = {
     { id: 'book', label: 'CTA', enabled: true, caption: 'Ready to explore?', title: 'Plan Your Ijen Bromo Adventure Today', text: '' },
     { id: 'blog', label: 'Blog', enabled: true, caption: 'Travel Tips', title: 'Travel Guide & Tips for Ijen Bromo', text: '' },
     { id: 'faq', label: 'FAQ', enabled: true, caption: 'Questions?', title: 'Frequently Asked Questions about Ijen Bromo Tour', text: '' },
+  ],
+  tripDetailSections: [
+    { id: 'media', label: 'Media Gallery', enabled: true, caption: 'Gallery', title: 'Trip Gallery', text: '' },
+    { id: 'header', label: 'Trip Header', enabled: true, caption: 'Trip Package', title: '', text: '' },
+    { id: 'meta', label: 'Trip Meta', enabled: true, caption: 'Trip Info', title: 'Trip Information', text: '' },
+    { id: 'overview', label: 'Overview', enabled: true, caption: 'Overview', title: 'Overview', text: '' },
+    { id: 'itinerary', label: 'Itinerary', enabled: true, caption: 'Itinerary', title: 'Itinerary', text: '' },
+    { id: 'cost', label: 'Cost', enabled: true, caption: 'Cost', title: 'Cost', text: '' },
+    { id: 'know-before-you-go', label: 'Highlights', enabled: true, caption: 'Highlights', title: 'Know before you go', text: '' },
+    { id: 'faq', label: 'FAQ', enabled: true, caption: 'FAQ', title: 'FAQ', text: '' },
+    { id: 'sidebar', label: 'Sticky Order Card', enabled: true, caption: 'Order', title: 'Order now', text: '' },
+  ],
+  destinationDetailSections: [
+    { id: 'media', label: 'Media Gallery', enabled: true, caption: 'Gallery', title: 'Destination Gallery', text: '' },
+    { id: 'header', label: 'Destination Header', enabled: true, caption: 'Destination', title: '', text: '' },
+    { id: 'about', label: 'About', enabled: true, caption: 'About', title: 'About', text: '' },
+    { id: 'highlights', label: 'Highlights', enabled: true, caption: 'Highlights', title: 'Highlights', text: '' },
+    { id: 'faq', label: 'FAQ', enabled: true, caption: 'FAQ', title: 'Frequently Asked Questions', text: '' },
+    { id: 'meta', label: 'Meta', enabled: true, caption: 'Meta', title: 'Destination Info', text: '' },
   ],
   destinationItems: [],
   whyChooseItems: [
@@ -113,40 +156,8 @@ const homepageDefaultDestinations = [
 ];
 
 const defaultState = {
-  trips: [
-    {
-      id: crypto.randomUUID(),
-      title: 'Ijen Blue Fire & Bromo Sunrise',
-      overview: 'Two iconic volcano experiences in one premium package.',
-      description: 'Explore Mount Ijen, watch the famous blue fire, and catch sunrise at Mount Bromo with an expert guide.',
-      highlights: ['Blue fire trekking', 'Bromo sunrise view', 'Local transport included'],
-      vehicle: 'Jeep + Bus',
-      duration: '3D2N',
-      groupSize: '12 pax',
-      bestTime: 'Apr - Oct',
-      price: 210,
-      discount: 15,
-      status: 'Active',
-      images: [],
-      itinerary: [
-        {
-          day: 'Day 1',
-          items: [{ time: '10:00', activity: 'Pickup and transfer to hotel' }],
-        },
-        {
-          day: 'Day 2',
-          items: [{ time: '01:30', activity: 'Ijen Blue Fire trek and crater tour' }],
-        },
-      ],
-      faqs: [
-        { question: 'Is transportation included?', answer: 'Yes, all transfers are included in the package.' },
-      ],
-    },
-  ],
-  services: [
-    { id: crypto.randomUUID(), name: 'Airport Pickup', type: 'Per Booking', price: 35, status: 'Active' },
-    { id: crypto.randomUUID(), name: 'Breakfast Package', type: 'Per Pax', price: 12, status: 'Active' },
-  ],
+  trips: [],
+  services: [],
   settings: {
     companyName: 'Ijen Bromo Trip',
     address: 'Jl. Bromo No. 12, East Java, Indonesia',
@@ -158,13 +169,11 @@ const defaultState = {
     whatsappUrlPosition: 'after',
     logo: '',
   },
-  destinations: [
-    ...homepageDefaultDestinations,
-  ],
+  destinations: [],
   layout: defaultLayout,
-  users: 1240,
-  bookings: 820,
-  revenue: 45230,
+  users: 0,
+  bookings: 0,
+  revenue: 0,
 };
 
 function saveStorage(data) {
@@ -298,24 +307,7 @@ function loadStorage() {
       ...defaultState,
       ...parsed,
       settings: { ...defaultState.settings, ...(parsed?.settings || {}) },
-      layout: {
-        ...defaultLayout,
-        ...(parsed?.layout || {}),
-        packageGrid: {
-          ...defaultLayout.packageGrid,
-          ...(parsed?.layout?.packageGrid || {}),
-        },
-        destinationGrid: {
-          ...defaultLayout.destinationGrid,
-          ...(parsed?.layout?.destinationGrid || {}),
-        },
-        destinationItems: Array.isArray(parsed?.layout?.destinationItems) ? parsed.layout.destinationItems : defaultLayout.destinationItems,
-        headerMenu: Array.isArray(parsed?.layout?.headerMenu) ? parsed.layout.headerMenu : defaultLayout.headerMenu,
-        footerMenu: Array.isArray(parsed?.layout?.footerMenu) ? parsed.layout.footerMenu : defaultLayout.footerMenu,
-        sections: Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : defaultLayout.sections,
-        whyChooseItems: Array.isArray(parsed?.layout?.whyChooseItems) ? parsed.layout.whyChooseItems : defaultLayout.whyChooseItems,
-        faqItems: Array.isArray(parsed?.layout?.faqItems) ? parsed.layout.faqItems : defaultLayout.faqItems,
-      },
+      layout: normalizeLayout(parsed?.layout),
       destinations: Array.isArray(parsed?.destinations)
         ? parsed.destinations.map((destination) => ({
           ...destination,
@@ -405,6 +397,7 @@ function mapTripRowToState(row) {
     price: Number(row.price ?? 0),
     discount: Number(row.discount ?? 0),
     status: row.status || 'Active',
+    coverImage: row.cover_image || row.image || (Array.isArray(row.images) ? row.images[0] : '') || '',
     images: Array.isArray(row.images) ? row.images : [],
     itinerary: Array.isArray(row.itinerary) ? row.itinerary : [],
     faqs: Array.isArray(row.faqs) ? row.faqs : [],
@@ -424,6 +417,7 @@ function normalizeTripForDb(trip) {
     price: Number(trip.price ?? 0),
     discount: Number(trip.discount ?? 0),
     status: trip.status || 'Active',
+    cover_image: trip.coverImage || (Array.isArray(trip.images) ? trip.images[0] : '') || '',
     images: Array.isArray(trip.images) ? trip.images : [],
     highlights: Array.isArray(trip.highlights) ? trip.highlights : [],
     itinerary: Array.isArray(trip.itinerary) ? trip.itinerary : [],
@@ -486,7 +480,7 @@ function normalizeServiceForDb(service) {
   };
 }
 
-function normalizeSettingsForDb(settings) {
+function normalizeSettingsForDb(settings, layout) {
   return {
     id: 'main',
     company_name: settings.companyName || '',
@@ -498,6 +492,7 @@ function normalizeSettingsForDb(settings) {
     whatsapp_message_suffix: settings.whatsappMessageSuffix || '',
     whatsapp_url_position: settings.whatsappUrlPosition || 'after',
     logo: settings.logo || '',
+    layout_json: normalizeLayout(layout),
     updated_at: new Date().toISOString(),
   };
 }
@@ -530,14 +525,14 @@ function normalizeMetricsForDb(payload) {
   };
 }
 
-async function pullRemoteData(config) {
+async function pullRemoteData(config, fallbackData = defaultState) {
   const supabase = getSupabaseClient(config);
   if (!supabase) return null;
 
   const [tripsResult, servicesResult, destinationsResult, settingsResult, metricsResult] = await Promise.all([
     supabase
       .from('trips')
-      .select('id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs,updated_at')
+      .select('id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,cover_image,images,highlights,itinerary,faqs,updated_at')
       .order('updated_at', { ascending: false }),
     supabase
       .from('services')
@@ -549,7 +544,7 @@ async function pullRemoteData(config) {
       .order('updated_at', { ascending: false }),
     supabase
       .from('site_settings')
-      .select('id,company_name,address,phone,email,currency_code,whatsapp_message_prefix,whatsapp_message_suffix,whatsapp_url_position,logo,updated_at')
+      .select('id,company_name,address,phone,email,currency_code,whatsapp_message_prefix,whatsapp_message_suffix,whatsapp_url_position,logo,layout_json,updated_at')
       .eq('id', 'main')
       .maybeSingle(),
     supabase
@@ -565,12 +560,17 @@ async function pullRemoteData(config) {
   if (settingsResult.error) throw settingsResult.error;
   if (metricsResult.error) throw metricsResult.error;
 
+  const remoteLayout = settingsResult.data?.layout_json
+    ? normalizeLayout(settingsResult.data.layout_json)
+    : normalizeLayout(fallbackData?.layout);
+
   return {
     ...defaultState,
     trips: (tripsResult.data || []).map(mapTripRowToState),
     services: (servicesResult.data || []).map(mapServiceRowToState),
     destinations: (destinationsResult.data || []).map(mapDestinationRowToState),
     settings: mapSettingsRowToState(settingsResult.data),
+    layout: remoteLayout,
     users: Number(metricsResult.data?.users ?? defaultState.users),
     bookings: Number(metricsResult.data?.bookings ?? defaultState.bookings),
     revenue: Number(metricsResult.data?.revenue ?? defaultState.revenue),
@@ -622,7 +622,7 @@ async function pushRemoteData(config, payload) {
 
   const { error: settingsError } = await supabase
     .from('site_settings')
-    .upsert(normalizeSettingsForDb(payload.settings || defaultState.settings), { onConflict: 'id' });
+    .upsert(normalizeSettingsForDb(payload.settings || defaultState.settings, payload.layout || defaultLayout), { onConflict: 'id' });
   if (settingsError) throw settingsError;
 
   const { error: metricsError } = await supabase
@@ -794,7 +794,7 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
                 <tr key={trip.id}>
                   <td>
                     <div className="thumb-cell">
-                      <img src={trip.images?.[0] || 'https://via.placeholder.com/120x90?text=Trip'} alt={trip.title} />
+                      <img src={trip.coverImage || trip.images?.[0] || 'https://via.placeholder.com/120x90?text=Trip'} alt={trip.title} />
                     </div>
                   </td>
                   <td>{trip.title}</td>
@@ -1124,6 +1124,7 @@ function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
     price: 0,
     discount: 0,
     status: 'Active',
+    coverImage: '',
     images: [],
     itinerary: [{ day: 'Day 1', items: [{ time: '', activity: '' }] }],
     faqs: [{ question: '', answer: '' }],
@@ -1133,8 +1134,13 @@ function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
   const [previewImages, setPreviewImages] = useState(existing?.images || []);
 
   useEffect(() => {
-    setForm(existing || emptyTrip);
-    setPreviewImages(existing?.images || []);
+    const source = existing || emptyTrip;
+    const sourceImages = source?.images || [];
+    setForm({
+      ...source,
+      coverImage: source.coverImage || sourceImages[0] || '',
+    });
+    setPreviewImages(sourceImages);
   }, [existing]);
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -1144,7 +1150,11 @@ function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
     const converted = await Promise.all(filesArray.map(convertImageToWebp));
     const merged = [...previewImages, ...converted].slice(0, 8);
     setPreviewImages(merged);
-    setForm((prev) => ({ ...prev, images: merged }));
+    setForm((prev) => ({
+      ...prev,
+      images: merged,
+      coverImage: prev.coverImage || merged[0] || '',
+    }));
   };
 
   const handleSetFrontImage = (index) => {
@@ -1154,13 +1164,22 @@ function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
       ...previewImages.filter((_, idx) => idx !== index),
     ];
     setPreviewImages(reordered);
-    setForm((prev) => ({ ...prev, images: reordered }));
+    setForm((prev) => ({
+      ...prev,
+      images: reordered,
+      coverImage: reordered[0] || '',
+    }));
   };
 
   const handleDeleteImage = (index) => {
     const updated = previewImages.filter((_, idx) => idx !== index);
     setPreviewImages(updated);
-    setForm((prev) => ({ ...prev, images: updated }));
+    setForm((prev) => {
+      const nextCover = prev.coverImage && updated.includes(prev.coverImage)
+        ? prev.coverImage
+        : (updated[0] || '');
+      return { ...prev, images: updated, coverImage: nextCover };
+    });
   };
 
   const handleHighlightChange = (index, value) => {
@@ -1199,7 +1218,8 @@ function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSave({ ...form, slug: slugify(form.slug || form.title) }, Boolean(existing));
+    const coverImage = form.coverImage || (Array.isArray(form.images) ? form.images[0] : '') || '';
+    onSave({ ...form, coverImage, slug: slugify(form.slug || form.title) }, Boolean(existing));
   };
 
   return (
@@ -1300,10 +1320,14 @@ function TripForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
             {previewImages.length > 0 && (
               <label>
                 Front Image (Card Cover)
-                <select value="0" onChange={(e) => handleSetFrontImage(Number(e.target.value))}>
-                  {previewImages.map((_, idx) => (
-                    <option key={idx} value={idx}>
-                      {idx === 0 ? `Image ${idx + 1} (Front)` : `Image ${idx + 1}`}
+                <select
+                  value={form.coverImage || ''}
+                  onChange={(e) => update('coverImage', e.target.value)}
+                >
+                  <option value="">Select front image</option>
+                  {previewImages.map((src, idx) => (
+                    <option key={idx} value={src}>
+                      {`Image ${idx + 1}`}
                     </option>
                   ))}
                 </select>
@@ -1571,10 +1595,11 @@ function DestinationForm({ existing, onSave, onCancel }) {
 }
 
 function LayoutView({ layout, destinations, onSave, onNotify }) {
-  const [form, setForm] = useState(layout || defaultLayout);
+  const [form, setForm] = useState(normalizeLayout(layout));
+  const [activeLayoutTab, setActiveLayoutTab] = useState('front-page');
 
   useEffect(() => {
-    setForm(layout || defaultLayout);
+    setForm(normalizeLayout(layout));
   }, [layout]);
 
   useEffect(() => {
@@ -1771,6 +1796,47 @@ function LayoutView({ layout, destinations, onSave, onNotify }) {
     }));
   };
 
+  const updateDetailSection = (groupKey, id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [groupKey]: (prev[groupKey] || []).map((section) => (section.id === id ? { ...section, [key]: value } : section)),
+    }));
+  };
+
+  const moveDetailSection = (groupKey, index, direction) => {
+    setForm((prev) => {
+      const current = [...(prev[groupKey] || [])];
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return prev;
+      [current[index], current[target]] = [current[target], current[index]];
+      return { ...prev, [groupKey]: current };
+    });
+  };
+
+  const addDetailCustomSection = (groupKey, labelPrefix) => {
+    setForm((prev) => ({
+      ...prev,
+      [groupKey]: [
+        ...(prev[groupKey] || []),
+        {
+          id: `custom-${crypto.randomUUID()}`,
+          label: `${labelPrefix} Custom Section`,
+          enabled: true,
+          caption: 'Custom',
+          title: 'New custom section',
+          text: 'Add your section content here.',
+        },
+      ],
+    }));
+  };
+
+  const removeDetailCustomSection = (groupKey, id) => {
+    setForm((prev) => ({
+      ...prev,
+      [groupKey]: (prev[groupKey] || []).filter((section) => section.id !== id),
+    }));
+  };
+
   const handleSave = () => {
     onSave(form);
     onNotify('Layout setting saved successfully', 'success');
@@ -1780,7 +1846,33 @@ function LayoutView({ layout, destinations, onSave, onNotify }) {
     <div className="page-panel">
       <SectionHeader title="Layout" description="Setup homepage structure and content" />
 
+      <div className="button-row" style={{ marginBottom: 16 }}>
+        <button
+          type="button"
+          className={classNames('secondary-btn', activeLayoutTab === 'front-page' && 'active-tab-btn')}
+          onClick={() => setActiveLayoutTab('front-page')}
+        >
+          Tab 1 - Layout Front Page
+        </button>
+        <button
+          type="button"
+          className={classNames('secondary-btn', activeLayoutTab === 'trip-detail' && 'active-tab-btn')}
+          onClick={() => setActiveLayoutTab('trip-detail')}
+        >
+          Tab 2 - Layout Trip Detail
+        </button>
+        <button
+          type="button"
+          className={classNames('secondary-btn', activeLayoutTab === 'destination-detail' && 'active-tab-btn')}
+          onClick={() => setActiveLayoutTab('destination-detail')}
+        >
+          Tab 3 - Layout Destination Detail
+        </button>
+      </div>
+
       <div className="form-card">
+        {activeLayoutTab === 'front-page' && (
+          <>
         <div className="form-section">
           <h3>Header Menu</h3>
           {form.headerMenu.map((item) => (
@@ -2031,6 +2123,112 @@ function LayoutView({ layout, destinations, onSave, onNotify }) {
             <button type="button" className="secondary-btn" onClick={addFooterMenu}>+ Add footer menu</button>
           </div>
         </div>
+          </>
+        )}
+
+        {activeLayoutTab === 'trip-detail' && (
+          <div className="form-section">
+            <h3>Trip Detail Sections</h3>
+            <p className="label-note" style={{ marginBottom: 10 }}>
+              Atur show/hide, urutan, dan teks section pada halaman detail trip.
+            </p>
+            {(form.tripDetailSections || []).map((section, index) => {
+              const isCustom = String(section.id || '').startsWith('custom-');
+              return (
+                <div key={section.id} className="form-section" style={{ marginBottom: 14 }}>
+                  <div className="button-row" style={{ justifyContent: 'space-between' }}>
+                    <strong>{section.label || section.id}</strong>
+                    <div className="button-row">
+                      <button type="button" className="secondary-btn" onClick={() => moveDetailSection('tripDetailSections', index, -1)}>↑</button>
+                      <button type="button" className="secondary-btn" onClick={() => moveDetailSection('tripDetailSections', index, 1)}>↓</button>
+                      {isCustom && (
+                        <button type="button" className="text-btn text-btn-danger" onClick={() => removeDetailCustomSection('tripDetailSections', section.id)}>Delete</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-grid-2">
+                    <label>
+                      Section Label
+                      <input value={section.label || ''} onChange={(e) => updateDetailSection('tripDetailSections', section.id, 'label', e.target.value)} />
+                    </label>
+                    <label>
+                      Caption
+                      <input value={section.caption || ''} onChange={(e) => updateDetailSection('tripDetailSections', section.id, 'caption', e.target.value)} />
+                    </label>
+                    <label>
+                      Title
+                      <input value={section.title || ''} onChange={(e) => updateDetailSection('tripDetailSections', section.id, 'title', e.target.value)} />
+                    </label>
+                    <label>
+                      Enabled
+                      <select value={section.enabled ? 'yes' : 'no'} onChange={(e) => updateDetailSection('tripDetailSections', section.id, 'enabled', e.target.value === 'yes')}>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Text
+                    <textarea rows="3" value={section.text || ''} onChange={(e) => updateDetailSection('tripDetailSections', section.id, 'text', e.target.value)} />
+                  </label>
+                </div>
+              );
+            })}
+            <button type="button" className="secondary-btn" onClick={() => addDetailCustomSection('tripDetailSections', 'Trip Detail')}>+ Add custom section</button>
+          </div>
+        )}
+
+        {activeLayoutTab === 'destination-detail' && (
+          <div className="form-section">
+            <h3>Destination Detail Sections</h3>
+            <p className="label-note" style={{ marginBottom: 10 }}>
+              Atur show/hide, urutan, dan teks section pada halaman detail destination.
+            </p>
+            {(form.destinationDetailSections || []).map((section, index) => {
+              const isCustom = String(section.id || '').startsWith('custom-');
+              return (
+                <div key={section.id} className="form-section" style={{ marginBottom: 14 }}>
+                  <div className="button-row" style={{ justifyContent: 'space-between' }}>
+                    <strong>{section.label || section.id}</strong>
+                    <div className="button-row">
+                      <button type="button" className="secondary-btn" onClick={() => moveDetailSection('destinationDetailSections', index, -1)}>↑</button>
+                      <button type="button" className="secondary-btn" onClick={() => moveDetailSection('destinationDetailSections', index, 1)}>↓</button>
+                      {isCustom && (
+                        <button type="button" className="text-btn text-btn-danger" onClick={() => removeDetailCustomSection('destinationDetailSections', section.id)}>Delete</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-grid-2">
+                    <label>
+                      Section Label
+                      <input value={section.label || ''} onChange={(e) => updateDetailSection('destinationDetailSections', section.id, 'label', e.target.value)} />
+                    </label>
+                    <label>
+                      Caption
+                      <input value={section.caption || ''} onChange={(e) => updateDetailSection('destinationDetailSections', section.id, 'caption', e.target.value)} />
+                    </label>
+                    <label>
+                      Title
+                      <input value={section.title || ''} onChange={(e) => updateDetailSection('destinationDetailSections', section.id, 'title', e.target.value)} />
+                    </label>
+                    <label>
+                      Enabled
+                      <select value={section.enabled ? 'yes' : 'no'} onChange={(e) => updateDetailSection('destinationDetailSections', section.id, 'enabled', e.target.value === 'yes')}>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Text
+                    <textarea rows="3" value={section.text || ''} onChange={(e) => updateDetailSection('destinationDetailSections', section.id, 'text', e.target.value)} />
+                  </label>
+                </div>
+              );
+            })}
+            <button type="button" className="secondary-btn" onClick={() => addDetailCustomSection('destinationDetailSections', 'Destination Detail')}>+ Add custom section</button>
+          </div>
+        )}
 
         <div className="form-actions form-actions-end">
           <button type="button" className="primary-btn" onClick={handleSave}>Save Layout</button>
@@ -2157,7 +2355,7 @@ function App() {
       }
 
       try {
-        const remote = await pullRemoteData(dbConfig);
+        const remote = await pullRemoteData(dbConfig, stored);
         if (remote) {
           setData(remote);
           saveStorage(remote);
@@ -2252,8 +2450,14 @@ function App() {
   };
 
   const handleSaveDbSettings = (config) => {
-    setDbConfig(config);
-    saveDbConfig(config);
+    const normalized = {
+      ...config,
+      url: sanitizeUrl(config?.url),
+      anonKey: (config?.anonKey || '').trim(),
+      enabled: Boolean(config?.enabled),
+    };
+    setDbConfig(normalized);
+    saveDbConfig(normalized);
   };
 
   const handleTestDb = async (overrideConfig) => {
@@ -2315,13 +2519,49 @@ function App() {
       return;
     }
 
+    const { error: tripsColumnsError } = await client
+      .from('trips')
+      .select('cover_image')
+      .limit(1);
+
+    if (tripsColumnsError) {
+      const msg = (tripsColumnsError.message || '').toLowerCase();
+      const code = tripsColumnsError.code || '';
+      if (code === '42703' || msg.includes('column') || msg.includes('does not exist')) {
+        notify('Connection OK, but trips is missing required column "cover_image". Run SQL migration from README step 0 first.', 'error');
+      } else {
+        notify(`trips column check failed: ${tripsColumnsError.message || code}`, 'error');
+      }
+      return;
+    }
+
+    // Step 3: check required columns for currency + whatsapp booking setup.
+    const { error: settingsColumnsError } = await client
+      .from('site_settings')
+      .select('currency_code,whatsapp_message_prefix,whatsapp_message_suffix,whatsapp_url_position,layout_json')
+      .limit(1);
+
+    if (settingsColumnsError) {
+      const msg = (settingsColumnsError.message || '').toLowerCase();
+      const code = settingsColumnsError.code || '';
+      if (code === '42703' || msg.includes('column') || msg.includes('does not exist')) {
+        notify(
+          'Connection OK, but site_settings is missing required columns (currency/whatsapp/layout). Run SQL migration from README step 0 first.',
+          'error',
+        );
+      } else {
+        notify(`site_settings column check failed: ${settingsColumnsError.message || code}`, 'error');
+      }
+      return;
+    }
+
     notify('Supabase connection successful. All tables found ✓', 'success');
   };
 
   const handlePullDb = async (overrideConfig) => {
     const targetConfig = overrideConfig || dbConfig;
     try {
-      const remote = await pullRemoteData(targetConfig);
+      const remote = await pullRemoteData(targetConfig, data);
       if (!remote) {
         notify('No data found in Supabase tables yet.', 'error');
         return;

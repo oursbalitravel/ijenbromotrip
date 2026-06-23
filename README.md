@@ -43,12 +43,16 @@ add column if not exists images jsonb not null default '[]'::jsonb,
 add column if not exists highlights jsonb not null default '[]'::jsonb,
 add column if not exists faqs jsonb not null default '[]'::jsonb;
 
+alter table public.trips
+add column if not exists cover_image text not null default '';
+
 -- Tambah kolom setting booking/currency jika belum ada
 alter table public.site_settings
 add column if not exists currency_code text not null default 'IDR',
 add column if not exists whatsapp_message_prefix text not null default 'Halo, saya ingin booking trip ini: ',
 add column if not exists whatsapp_message_suffix text not null default '',
-add column if not exists whatsapp_url_position text not null default 'after';
+add column if not exists whatsapp_url_position text not null default 'after',
+add column if not exists layout_json jsonb not null default '{}'::jsonb;
 ```
 - **Jika table belum ada**: Gunakan SQL CREATE di step 1, sudah termasuk semua field baru.
 
@@ -66,6 +70,7 @@ create table if not exists public.trips (
    price numeric not null default 0,
    discount numeric not null default 0,
    status text not null default 'Active',
+   cover_image text not null default '',
    images jsonb not null default '[]'::jsonb,
    highlights jsonb not null default '[]'::jsonb,
    itinerary jsonb not null default '[]'::jsonb,
@@ -107,6 +112,7 @@ create table if not exists public.site_settings (
    whatsapp_message_prefix text not null default 'Halo, saya ingin booking trip ini: ',
    whatsapp_message_suffix text not null default '',
    whatsapp_url_position text not null default 'after',
+   layout_json jsonb not null default '{}'::jsonb,
    logo text not null default '',
    updated_at timestamptz not null default now()
 );
