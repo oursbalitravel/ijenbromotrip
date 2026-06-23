@@ -364,12 +364,20 @@ function renderFaq(layout) {
   });
 }
 
+function getTripCardImage(trip) {
+  if (!trip) return 'https://via.placeholder.com/600x450?text=Trip';
+
+  const candidates = [trip.coverImage, trip.image, ...(Array.isArray(trip.images) ? trip.images : [])];
+  const image = candidates.find((item) => typeof item === 'string' && item.trim());
+  return image || 'https://via.placeholder.com/600x450?text=Trip';
+}
+
 function createPackageCard(trip) {
   const slug = trip.slug || slugify(trip.title);
   const article = document.createElement('article');
   article.className = 'package-card';
   article.innerHTML = `
-    <img src="${trip.images?.[0] || 'https://via.placeholder.com/600x450?text=Trip'}" alt="${trip.title || 'Trip package'}" />
+    <img src="${getTripCardImage(trip)}" alt="${trip.title || 'Trip package'}" />
     <div class="card-content">
       <h3>${trip.title || 'Untitled Package'}</h3>
       <p>${trip.overview || trip.description || 'Explore this amazing package with our expert guides.'}</p>

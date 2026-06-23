@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const STORAGE_KEY = 'ijen-bromo-admin-data';
 const DB_CONFIG_KEY = 'ijen-bromo-db-config';
+const HOMEPAGE_TRIPS_CACHE_KEY = 'ijen-bromo-homepage-trips-cache';
+const HOMEPAGE_DESTINATIONS_CACHE_KEY = 'ijen-bromo-homepage-destinations-cache';
 
 function slugify(text) {
   return (text || '')
@@ -2262,15 +2264,10 @@ function App() {
 
       setData(remote);
       saveStorage(remote);
-      
-      // Also save to homepage cache keys for instant homepage sync
-      if (remote.trips && remote.trips.length > 0) {
-        localStorage.setItem('ijen-bromo-homepage-trips-cache', JSON.stringify(remote.trips));
-      }
-      if (remote.destinations && remote.destinations.length > 0) {
-        localStorage.setItem('ijen-bromo-homepage-destinations-cache', JSON.stringify(remote.destinations));
-      }
-      
+
+      localStorage.setItem(HOMEPAGE_TRIPS_CACHE_KEY, JSON.stringify(remote.trips || []));
+      localStorage.setItem(HOMEPAGE_DESTINATIONS_CACHE_KEY, JSON.stringify(remote.destinations || []));
+
       notify('Data pulled from Supabase and synced to homepage.', 'success');
     } catch (error) {
       notify(`Failed to pull data from Supabase: ${formatSupabaseError(error)}`, 'error');
@@ -2281,6 +2278,9 @@ function App() {
     const targetConfig = overrideConfig || dbConfig;
     try {
       await pushRemoteData(targetConfig, data);
+      saveStorage(data);
+      localStorage.setItem(HOMEPAGE_TRIPS_CACHE_KEY, JSON.stringify(data.trips || []));
+      localStorage.setItem(HOMEPAGE_DESTINATIONS_CACHE_KEY, JSON.stringify(data.destinations || []));
       notify('Data pushed to Supabase.', 'success');
     } catch (error) {
       notify(`Failed to push data to Supabase: ${formatSupabaseError(error)}`, 'error');

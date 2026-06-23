@@ -41,6 +41,17 @@ function loadAdminTrips() {
   }
 }
 
+function loadAdminSettings() {
+  try {
+    const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.settings || null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadTripsFromSupabase(config) {
   if (!config.enabled || !config.url || !config.anonKey) return [];
   const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs&order=updated_at.desc`;
@@ -75,6 +86,82 @@ async function loadTripsFromSupabase(config) {
   }));
 }
 
+function formatCurrency(value) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function normalizePhone(phone) {
+  return (phone || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
+}
+
+function buildOrderLink(trip) {
+  const settings = loadAdminSettings();
+  const phone = normalizePhone(settings?.phone || '');
+  const message = encodeURIComponent(`Hello, I want to order: ${trip.title || 'Trip package'}`);
+  if (phone) {
+    return `https://wa.me/${phone}?text=${message}`;
+  }
+  if (settings?.email) {
+    return `mailto:${settings.email}?subject=${encodeURIComponent(`Order request - ${trip.title || 'Trip package'}`)}&body=${message}`;
+  }
+  return '#overview';
+}
+
+function getTripImages(trip) {
+  const images = Array.isArray(trip.images) ? trip.images.filter(Boolean) : [];
+  return images.length ? images : ['https://via.placeholder.com/1200x700?text=Trip+Image'];
+}
+
+function closePreview(root) {
+  const modal = root.querySelector('[data-preview-modal]');
+  if (!modal) return;
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function openPreview(root, src, alt) {
+  const modal = root.querySelector('[data-preview-modal]');
+  const image = root.querySelector('[data-preview-image]');
+  const caption = root.querySelector('[data-preview-caption]');
+  if (!modal || !image) return;
+  image.src = src;
+  image.alt = alt || 'Preview image';
+  if (caption) {
+    caption.textContent = alt || 'Preview image';
+  }
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function bindTripInteractions(root) {
+  root.querySelectorAll('[data-preview-src]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const src = button.getAttribute('data-preview-src');
+      const alt = button.getAttribute('data-preview-alt') || '';
+      if (src) openPreview(root, src, alt);
+    });
+  });
+
+  const modal = root.querySelector('[data-preview-modal]');
+  if (modal) {
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target.matches('[data-preview-close]')) {
+        closePreview(root);
+      }
+    });
+  }
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closePreview(root);
+    }
+  });
+}
+
 function getSlugParam() {
   const params = new URLSearchParams(window.location.search);
   return slugify(params.get('slug') || '');
@@ -84,71 +171,144 @@ function renderTrip(trip) {
   const root = document.getElementById('trip-detail-root');
   if (!root) return;
 
-  const images = Array.isArray(trip.images) && trip.images.length
-    ? trip.images
-    : ['https://via.placeholder.com/1200x700?text=Trip+Image'];
+  const images = getTripImages(trip);
 
   const highlights = Array.isArray(trip.highlights) ? trip.highlights.filter(Boolean) : [];
   const itinerary = Array.isArray(trip.itinerary) ? trip.itinerary : [];
   const faqs = Array.isArray(trip.faqs) ? trip.faqs : [];
+  const mainImage = images[0];
+  const sections = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'itinerary', label: 'Itinerary' },
+    { id: 'cost', label: 'Cost' },
+    { id: 'know-before-you-go', label: 'Know before you go' },
+  ];
+  const orderLink = buildOrderLink(trip);
 
   root.innerHTML = `
     <article class="trip-detail-shell">
-      <section class="trip-media-grid">
-        <img class="trip-media-main" src="${images[0]}" alt="${trip.title || 'Trip'}" />
-        <div class="trip-media-side">
-          ${images.slice(1, 5).map((src, idx) => `<img src="${src}" alt="Gallery ${idx + 2}" />`).join('')}
-        </div>
-      </section>
+      <nav class="trip-breadcrumb" aria-label="Breadcrumb">
+        <a href="index.html">Home</a>
+        <span>/</span>
+        <a href="index.html#packages">Trip Package</a>
+        <span>/</span>
+        <span>${trip.title || 'Trip detail'}</span>
+      </nav>
 
-      <section class="trip-detail-head">
-        <p class="section-label">Trip Package</p>
-        <h1>${trip.title || 'Untitled Trip'}</h1>
-        <p>${trip.overview || trip.description || ''}</p>
-      </section>
-
-      <section class="trip-detail-meta">
-        <div><strong>Duration</strong><span>${trip.duration || '-'}</span></div>
-        <div><strong>Group Size</strong><span>${trip.groupSize || '-'}</span></div>
-        <div><strong>Vehicle</strong><span>${trip.vehicle || '-'}</span></div>
-        <div><strong>Best Time</strong><span>${trip.bestTime || '-'}</span></div>
-        <div><strong>Price</strong><span>$${trip.price || 0} / person</span></div>
-      </section>
-
-      <section class="trip-detail-body">
-        <h2>Overview</h2>
-        <p>${trip.description || 'No description yet.'}</p>
-      </section>
-
-      <section class="trip-detail-body">
-        <h2>Highlights</h2>
-        <ul>
-          ${highlights.length ? highlights.map((item) => `<li>${item}</li>`).join('') : '<li>No highlights yet.</li>'}
-        </ul>
-      </section>
-
-      <section class="trip-detail-body">
-        <h2>Itinerary</h2>
-        <div class="trip-itinerary-list">
-          ${itinerary.length ? itinerary.map((day) => `
-            <div class="trip-itinerary-day">
-              <h3>${day.day || 'Day'}</h3>
-              <ul>
-                ${(Array.isArray(day.items) ? day.items : []).map((item) => `<li><strong>${item.time || ''}</strong> ${item.activity || ''}</li>`).join('')}
-              </ul>
+      <div class="trip-detail-layout">
+        <main class="trip-detail-main">
+          <section class="trip-media-grid">
+            <button type="button" class="trip-image-trigger trip-media-main-button" data-preview-src="${mainImage}" data-preview-alt="${trip.title || 'Trip'}">
+              <img class="trip-media-main" src="${mainImage}" alt="${trip.title || 'Trip'}" />
+            </button>
+            <div class="trip-media-side">
+              ${images.slice(1, 5).map((src, idx) => `
+                <button type="button" class="trip-image-trigger" data-preview-src="${src}" data-preview-alt="${trip.title || 'Trip'} image ${idx + 2}">
+                  <img src="${src}" alt="Gallery ${idx + 2}" />
+                </button>
+              `).join('')}
             </div>
-          `).join('') : '<p>No itinerary available.</p>'}
-        </div>
-      </section>
+          </section>
 
-      <section class="trip-detail-body">
-        <h2>FAQ</h2>
-        <div class="faq-list">
-          ${faqs.length ? faqs.map((faq) => `<details><summary>${faq.question || 'Question'}</summary><p>${faq.answer || ''}</p></details>`).join('') : '<p>No FAQs yet.</p>'}
+          <section class="trip-detail-head">
+            <p class="section-label">Trip Package</p>
+            <h1>${trip.title || 'Untitled Trip'}</h1>
+            <p>${trip.overview || trip.description || ''}</p>
+            <div class="trip-detail-shortcuts" aria-label="Section shortcuts">
+              ${sections.map((section) => `<a class="trip-shortcut-link" href="#${section.id}">${section.label}</a>`).join('')}
+            </div>
+          </section>
+
+          <section class="trip-detail-meta">
+            <div><strong>Duration</strong><span>${trip.duration || '-'}</span></div>
+            <div><strong>Group Size</strong><span>${trip.groupSize || '-'}</span></div>
+            <div><strong>Vehicle</strong><span>${trip.vehicle || '-'}</span></div>
+            <div><strong>Best Time</strong><span>${trip.bestTime || '-'}</span></div>
+          </section>
+
+          <section class="trip-detail-body" id="overview">
+            <h2>Overview</h2>
+            <p>${trip.description || 'No description yet.'}</p>
+          </section>
+
+          <section class="trip-detail-body" id="itinerary">
+            <h2>Itinerary</h2>
+            <div class="trip-itinerary-list">
+              ${itinerary.length ? itinerary.map((day) => `
+                <div class="trip-itinerary-day">
+                  <h3>${day.day || 'Day'}</h3>
+                  <ul>
+                    ${(Array.isArray(day.items) ? day.items : []).map((item) => `<li><strong>${item.time || ''}</strong> ${item.activity || ''}</li>`).join('')}
+                  </ul>
+                </div>
+              `).join('') : '<p>No itinerary available.</p>'}
+            </div>
+          </section>
+
+          <section class="trip-detail-body" id="cost">
+            <h2>Cost</h2>
+            <div class="trip-cost-inline">
+              <div>
+                <p class="section-label">From</p>
+                <strong>${formatCurrency(trip.price)}</strong>
+              </div>
+              <div>
+                <p class="section-label">Discount</p>
+                <strong>${Number(trip.discount || 0) ? `${trip.discount}%` : '-'}</strong>
+              </div>
+            </div>
+            <p class="trip-cost-note">Price shown is for reference and can change based on availability.</p>
+          </section>
+
+          <section class="trip-detail-body" id="know-before-you-go">
+            <h2>Know before you go</h2>
+            <ul>
+              ${highlights.length ? highlights.map((item) => `<li>${item}</li>`).join('') : '<li>No highlights yet.</li>'}
+            </ul>
+          </section>
+
+          <section class="trip-detail-body" id="faq">
+            <h2>FAQ</h2>
+            <div class="faq-list">
+              ${faqs.length ? faqs.map((faq) => `<details><summary>${faq.question || 'Question'}</summary><p>${faq.answer || ''}</p></details>`).join('') : '<p>No FAQs yet.</p>'}
+            </div>
+          </section>
+        </main>
+
+        <aside class="trip-detail-sidebar">
+          <div class="trip-sticky-card">
+            <div class="trip-sticky-price-header">
+              <span>Rp IDR</span>
+              <span class="trip-sticky-badge">Best price guaranteed</span>
+            </div>
+            <div class="trip-sticky-price-block">
+              <p>From</p>
+              <strong>${formatCurrency(trip.price)}</strong>
+              <span>/ Adult</span>
+            </div>
+            <ul class="trip-includes-list">
+              <li>Best Price Guaranteed</li>
+              <li>No Booking Fees</li>
+              <li>Professional Local Guide</li>
+            </ul>
+            <a class="primary-btn trip-order-btn" href="${orderLink}" target="_blank" rel="noreferrer">Order Now</a>
+            <a class="trip-availability-link" href="#overview">Check Availability</a>
+            <p class="trip-contact-note">Hi, we are ready to help you order this trip package.</p>
+          </div>
+        </aside>
+      </div>
+
+      <div class="trip-image-preview-modal" data-preview-modal aria-hidden="true">
+        <div class="trip-image-preview-dialog" role="dialog" aria-modal="true" aria-label="Image preview">
+          <button type="button" class="trip-image-preview-close" data-preview-close>×</button>
+          <img data-preview-image src="${mainImage}" alt="${trip.title || 'Trip'}" />
+          <p data-preview-caption>${trip.title || 'Trip'} image</p>
         </div>
-      </section>
+      </div>
     </article>
   `;
+
+  bindTripInteractions(root);
 }
 
 function renderNotFound() {
