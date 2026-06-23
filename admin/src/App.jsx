@@ -16,6 +16,7 @@ function slugify(text) {
 
 const defaultLayout = {
   packageGrid: { columns: 4, rows: 2 },
+  destinationGrid: { columns: 4, rows: 1 },
   headerMenu: [
     { id: crypto.randomUUID(), label: 'Home', href: '#hero' },
     { id: crypto.randomUUID(), label: 'Trip Package', href: '#packages' },
@@ -52,6 +53,37 @@ const defaultLayout = {
   heroImages: [],
   footerText: '© 2014–2026 IjenBromoTrip',
 };
+
+const homepageDefaultDestinations = [
+  {
+    id: 'homepage-destination-1',
+    name: 'Mount Ijen',
+    summary: 'Blue fire trek and sunrise adventure near the crater lake.',
+    image: 'https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?auto=format&fit=crop&w=800&q=80',
+    status: 'Active',
+  },
+  {
+    id: 'homepage-destination-2',
+    name: 'Mount Bromo',
+    summary: 'Volcanic sunrise viewpoints and jeep routes across the sea of sand.',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
+    status: 'Active',
+  },
+  {
+    id: 'homepage-destination-3',
+    name: 'Tumpak Sewu Waterfall',
+    summary: 'A dramatic curtain waterfall with lush canyon scenery.',
+    image: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=800&q=80',
+    status: 'Active',
+  },
+  {
+    id: 'homepage-destination-4',
+    name: 'Madakaripura',
+    summary: 'Hidden canyon waterfall and one of East Java’s iconic nature spots.',
+    image: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=800&q=80',
+    status: 'Active',
+  },
+];
 
 const defaultState = {
   trips: [
@@ -96,20 +128,7 @@ const defaultState = {
     logo: '',
   },
   destinations: [
-    {
-      id: crypto.randomUUID(),
-      name: 'Mount Ijen',
-      summary: 'Witness iconic blue fire and sunrise at Ijen crater.',
-      image: 'https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?auto=format&fit=crop&w=800&q=80',
-      status: 'Active',
-    },
-    {
-      id: crypto.randomUUID(),
-      name: 'Mount Bromo',
-      summary: 'Sunrise jeep tour over the Sea of Sand and crater rim.',
-      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
-      status: 'Active',
-    },
+    ...homepageDefaultDestinations,
   ],
   layout: defaultLayout,
   users: 1240,
@@ -255,6 +274,10 @@ function loadStorage() {
           ...defaultLayout.packageGrid,
           ...(parsed?.layout?.packageGrid || {}),
         },
+        destinationGrid: {
+          ...defaultLayout.destinationGrid,
+          ...(parsed?.layout?.destinationGrid || {}),
+        },
         headerMenu: Array.isArray(parsed?.layout?.headerMenu) ? parsed.layout.headerMenu : defaultLayout.headerMenu,
         footerMenu: Array.isArray(parsed?.layout?.footerMenu) ? parsed.layout.footerMenu : defaultLayout.footerMenu,
         sections: Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : defaultLayout.sections,
@@ -371,6 +394,27 @@ function normalizeTripForDb(trip) {
   };
 }
 
+function mapDestinationRowToState(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    summary: row.summary || '',
+    image: row.image || '',
+    status: row.status || 'Active',
+  };
+}
+
+function normalizeDestinationForDb(destination) {
+  return {
+    id: destination.id,
+    name: destination.name || '',
+    summary: destination.summary || '',
+    image: destination.image || '',
+    status: destination.status || 'Active',
+    updated_at: new Date().toISOString(),
+  };
+}
+
 function mapServiceRowToState(row) {
   return {
     id: row.id,
@@ -432,7 +476,7 @@ async function pullRemoteData(config) {
   const supabase = getSupabaseClient(config);
   if (!supabase) return null;
 
-  const [tripsResult, servicesResult, settingsResult, metricsResult] = await Promise.all([
+  const [tripsResult, servicesResult, destinationsResult, settingsResult, metricsResult] = await Promise.all([
     supabase
       .from('trips')
       .select('id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs,updated_at')
@@ -440,6 +484,10 @@ async function pullRemoteData(config) {
     supabase
       .from('services')
       .select('id,name,type,price,status,updated_at')
+      .order('updated_at', { ascending: false }),
+    supabase
+      .from('destinations')
+      .select('id,name,summary,image,status,updated_at')
       .order('updated_at', { ascending: false }),
     supabase
       .from('site_settings')
@@ -455,6 +503,7 @@ async function pullRemoteData(config) {
 
   if (tripsResult.error) throw tripsResult.error;
   if (servicesResult.error) throw servicesResult.error;
+  if (destinationsResult.error) throw destinationsResult.error;
   if (settingsResult.error) throw settingsResult.error;
   if (metricsResult.error) throw metricsResult.error;
 
@@ -462,6 +511,7 @@ async function pullRemoteData(config) {
     ...defaultState,
     trips: (tripsResult.data || []).map(mapTripRowToState),
     services: (servicesResult.data || []).map(mapServiceRowToState),
+    destinations: (destinationsResult.data || []).map(mapDestinationRowToState),
     settings: mapSettingsRowToState(settingsResult.data),
     users: Number(metricsResult.data?.users ?? defaultState.users),
     bookings: Number(metricsResult.data?.bookings ?? defaultState.bookings),
@@ -506,9 +556,11 @@ async function pushRemoteData(config, payload) {
 
   const tripRows = (payload.trips || []).map(normalizeTripForDb);
   const serviceRows = (payload.services || []).map(normalizeServiceForDb);
+  const destinationRows = (payload.destinations || []).map(normalizeDestinationForDb);
 
   await syncCollection(supabase, 'trips', tripRows);
   await syncCollection(supabase, 'services', serviceRows);
+  await syncCollection(supabase, 'destinations', destinationRows);
 
   const { error: settingsError } = await supabase
     .from('site_settings')
@@ -1520,6 +1572,44 @@ function LayoutView({ layout, onSave, onNotify }) {
         </div>
 
         <div className="form-section">
+          <h3>Destination Grid</h3>
+          <div className="form-grid-2">
+            <label>
+              Columns
+              <input
+                type="number"
+                min="1"
+                max="4"
+                value={form.destinationGrid?.columns || 4}
+                onChange={(e) => setForm((prev) => ({
+                  ...prev,
+                  destinationGrid: {
+                    ...prev.destinationGrid,
+                    columns: Math.max(1, Math.min(4, Number(e.target.value) || 1)),
+                  },
+                }))}
+              />
+            </label>
+            <label>
+              Rows
+              <input
+                type="number"
+                min="1"
+                max="4"
+                value={form.destinationGrid?.rows || 1}
+                onChange={(e) => setForm((prev) => ({
+                  ...prev,
+                  destinationGrid: {
+                    ...prev.destinationGrid,
+                    rows: Math.max(1, Math.min(4, Number(e.target.value) || 1)),
+                  },
+                }))}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="form-section">
           <h3>Sections (edit, add, delete)</h3>
           {form.sections.map((section, index) => {
             const isCustom = section.id.startsWith('custom-');
@@ -1914,7 +2004,7 @@ function App() {
     }
 
     // Step 2: check remaining tables
-    const remaining = ['services', 'site_settings', 'site_metrics'];
+    const remaining = ['services', 'destinations', 'site_settings', 'site_metrics'];
     const missing = [];
     for (const table of remaining) {
       const { error, status } = await client.from(table).select('id').limit(1);
@@ -1974,6 +2064,17 @@ function App() {
     }
     setData((prev) => ({ ...prev, trips: [...newTrips, ...prev.trips] }));
     notify(`${newTrips.length} package(s) imported. Click "Push to Supabase" to sync.`, 'success');
+  };
+
+  const handleImportDestinationsFromHomepage = () => {
+    const existingIds = new Set(data.destinations.map((item) => item.id));
+    const newDestinations = homepageDefaultDestinations.filter((item) => !existingIds.has(item.id));
+    if (!newDestinations.length) {
+      notify('Homepage destinations are already imported.', 'success');
+      return;
+    }
+    setData((prev) => ({ ...prev, destinations: [...newDestinations, ...prev.destinations] }));
+    notify(`${newDestinations.length} destination(s) imported. Click "Push to Supabase" to sync.`, 'success');
   };
 
   const exportCsv = (section) => {
@@ -2076,6 +2177,7 @@ function App() {
           </div>
           <div className="toolbar-actions">
             <button className="primary-btn" onClick={handleImportFromHomepage}>Import Homepage Packages</button>
+            <button className="secondary-btn" onClick={handleImportDestinationsFromHomepage}>Import Homepage Destinations</button>
             <button className="secondary-btn" onClick={exportJson}>Export JSON</button>
             <button className="secondary-btn" onClick={() => exportCsv('trips')}>Export Trips CSV</button>
             <input type="file" accept=".json,.csv" onChange={(e) => handleImport(e.target.files?.[0])} className="file-input" />

@@ -1,6 +1,7 @@
 const ADMIN_STORAGE_KEY = 'ijen-bromo-admin-data';
 const DB_CONFIG_KEY = 'ijen-bromo-db-config';
 const HOMEPAGE_TRIPS_CACHE_KEY = 'ijen-bromo-homepage-trips-cache';
+const HOMEPAGE_DESTINATIONS_CACHE_KEY = 'ijen-bromo-homepage-destinations-cache';
 
 function sanitizeUrl(url) {
   return (url || '').trim().replace(/\/+$/, '');
@@ -73,6 +74,31 @@ async function loadTripsFromSupabase(config) {
   }));
 }
 
+async function loadDestinationsFromSupabase(config) {
+  if (!config.enabled || !config.url || !config.anonKey) return [];
+
+  const endpoint = `${config.url}/rest/v1/destinations?select=id,name,summary,image,status&order=updated_at.desc`;
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+    },
+  });
+
+  if (!response.ok) return [];
+
+  const rows = await response.json();
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name || '',
+    summary: row.summary || '',
+    image: row.image || '',
+    status: row.status || 'Active',
+  }));
+}
+
 function loadAdminData() {
   if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
@@ -122,10 +148,31 @@ function saveTripsCache(trips) {
   }
 }
 
+function saveDestinationsCache(destinations) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(HOMEPAGE_DESTINATIONS_CACHE_KEY, JSON.stringify(destinations || []));
+  } catch {
+    // Ignore cache write errors.
+  }
+}
+
 function loadTripsCache() {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(HOMEPAGE_TRIPS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadDestinationsCache() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(HOMEPAGE_DESTINATIONS_CACHE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -238,16 +285,25 @@ function applySectionLayout(layout) {
   });
 }
 
-function renderDestinations(adminData) {
-  const items = Array.isArray(adminData?.destinations) ? adminData.destinations : [];
+function renderDestinations(layout, destinations) {
+  const items = Array.isArray(destinations) ? destinations : [];
   const grid = document.querySelector('#destinations .dest-grid');
-  if (!grid || !items.length) return;
+  if (!grid) return;
 
   const activeItems = items.filter((item) => (item.status || 'Active') === 'Active');
-  if (!activeItems.length) return;
-
   grid.innerHTML = '';
-  activeItems.slice(0, 8).forEach((item) => {
+  const columns = Number(layout?.destinationGrid?.columns || 4);
+  const rows = Number(layout?.destinationGrid?.rows || 1);
+  const total = Math.max(1, columns) * Math.max(1, rows);
+
+  grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
+
+  if (!activeItems.length) {
+    grid.innerHTML = '<p class="empty-row">Destination belum tersedia. Silakan import dari homepage atau tambah lewat admin.</p>';
+    return;
+  }
+
+  activeItems.slice(0, total).forEach((item) => {
     const card = document.createElement('article');
     card.className = 'destination-card';
     card.innerHTML = `
@@ -328,7 +384,6 @@ async function renderAdminPackages() {
   applyFooterMenu(layout);
   applyHeroImages(layout);
   applySectionLayout(layout);
-  renderDestinations(adminData);
   renderWhyChoose(layout);
   renderFaq(layout);
 
@@ -336,16 +391,22 @@ async function renderAdminPackages() {
   grid.innerHTML = '';
 
   let adminTrips = [];
+  let adminDestinations = [];
 
   // Keep homepage data source consistent with admin setup: Supabase only when enabled.
   if (dbConfig.enabled && dbConfig.url && dbConfig.anonKey) {
     try {
       adminTrips = await loadTripsFromSupabase(dbConfig);
+      adminDestinations = await loadDestinationsFromSupabase(dbConfig);
       if (adminTrips.length) {
         saveTripsCache(adminTrips);
       }
+      if (adminDestinations.length) {
+        saveDestinationsCache(adminDestinations);
+      }
     } catch {
       adminTrips = [];
+      adminDestinations = [];
     }
   }
 
@@ -359,6 +420,19 @@ async function renderAdminPackages() {
       saveTripsCache(adminTrips);
     }
   }
+
+  if (!adminDestinations.length) {
+    adminDestinations = loadDestinationsCache();
+  }
+
+  if (!adminDestinations.length) {
+    adminDestinations = Array.isArray(adminData?.destinations) ? adminData.destinations : [];
+    if (adminDestinations.length) {
+      saveDestinationsCache(adminDestinations);
+    }
+  }
+
+  renderDestinations(layout, adminDestinations);
 
   if (!adminTrips.length) {
     grid.innerHTML = '<p class="empty-row">Trip package belum tersedia. Silakan tambah dari admin lalu push/pull data.</p>';

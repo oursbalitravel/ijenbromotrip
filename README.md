@@ -63,6 +63,15 @@ create table if not exists public.services (
    updated_at timestamptz not null default now()
 );
 
+create table if not exists public.destinations (
+   id text primary key,
+   name text not null,
+   summary text not null default '',
+   image text not null default '',
+   status text not null default 'Active',
+   updated_at timestamptz not null default now()
+);
+
 create table if not exists public.site_settings (
    id text primary key,
    company_name text not null default 'Ijen Bromo Trip',
@@ -91,6 +100,7 @@ on conflict (id) do nothing;
 
 alter table public.trips enable row level security;
 alter table public.services enable row level security;
+alter table public.destinations enable row level security;
 alter table public.site_settings enable row level security;
 alter table public.site_metrics enable row level security;
 
@@ -123,6 +133,21 @@ using (true);
 drop policy if exists "public write services" on public.services;
 create policy "public write services"
 on public.services
+for all
+to anon
+using (true)
+with check (true);
+
+drop policy if exists "public read destinations" on public.destinations;
+create policy "public read destinations"
+on public.destinations
+for select
+to anon
+using (true);
+
+drop policy if exists "public write destinations" on public.destinations;
+create policy "public write destinations"
+on public.destinations
 for all
 to anon
 using (true)
