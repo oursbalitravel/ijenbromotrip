@@ -517,6 +517,19 @@ textarea {
   flex-wrap: wrap;
 }
 
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.active-tab-btn {
+  background: rgba(255, 91, 0, 0.12);
+  border-color: rgba(255, 91, 0, 0.4);
+  color: var(--primary);
+}
+
 .form-actions-end {
   justify-content: flex-end;
 }

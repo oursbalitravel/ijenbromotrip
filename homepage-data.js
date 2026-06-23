@@ -5,6 +5,15 @@ function sanitizeUrl(url) {
   return (url || '').trim().replace(/\/+$/, '');
 }
 
+function slugify(text) {
+  return (text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-') || 'trip-package';
+}
+
 function resolveSupabaseConfig() {
   if (typeof window === 'undefined') {
     return { url: '', anonKey: '', enabled: false };
@@ -45,6 +54,7 @@ async function loadTripsFromSupabase(config) {
 
   return rows.map((row) => ({
     id: row.id,
+    slug: slugify(row.slug || row.title || ''),
     title: row.title || '',
     overview: row.overview || '',
     description: row.description || '',
@@ -62,21 +72,160 @@ async function loadTripsFromSupabase(config) {
   }));
 }
 
-function loadAdminTrips() {
+function loadAdminData() {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function loadAdminTrips(adminData) {
+  if (adminData && Array.isArray(adminData.trips)) {
+    return adminData.trips.map((trip) => ({
+      ...trip,
+      slug: trip.slug || slugify(trip.title),
+    }));
+  }
+
   if (typeof window === 'undefined') return [];
   const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
-    if (Array.isArray(parsed.trips)) return parsed.trips;
+    if (Array.isArray(parsed)) {
+      return parsed.map((trip) => ({ ...trip, slug: trip.slug || slugify(trip.title) }));
+    }
+    if (Array.isArray(parsed.trips)) {
+      return parsed.trips.map((trip) => ({ ...trip, slug: trip.slug || slugify(trip.title) }));
+    }
     return [];
-  } catch (error) {
+  } catch {
     return [];
   }
 }
 
+function resolveLayout(adminData) {
+  return adminData?.layout || {};
+}
+
+function applyHeaderMenu(layout) {
+  const nav = document.querySelector('.nav-menu');
+  const menu = Array.isArray(layout?.headerMenu) ? layout.headerMenu : [];
+  if (!nav || !menu.length) return;
+
+  nav.innerHTML = '';
+  menu.forEach((item) => {
+    const link = document.createElement('a');
+    link.href = item.href || '#hero';
+    link.textContent = item.label || 'Menu';
+    nav.appendChild(link);
+  });
+}
+
+function applyHeroImages(layout) {
+  const heroImages = Array.isArray(layout?.heroImages) ? layout.heroImages : [];
+  if (!heroImages.length) return;
+
+  const slides = document.querySelectorAll('.hero-slide');
+  slides.forEach((slide, index) => {
+    if (heroImages[index]) {
+      slide.style.backgroundImage = `url('${heroImages[index]}')`;
+    }
+  });
+}
+
+function applySectionLayout(layout) {
+  const sections = Array.isArray(layout?.sections) ? layout.sections : [];
+  const footerText = document.querySelector('.bottom-footer p');
+  if (footerText && layout?.footerText) {
+    footerText.textContent = layout.footerText;
+  }
+
+  // Remove previously rendered custom blocks before rendering new ones.
+  document.querySelectorAll('.custom-layout-section').forEach((el) => el.remove());
+
+  const main = document.querySelector('main');
+  const footer = document.querySelector('footer.site-footer');
+
+  if (main && footer) {
+    sections
+      .filter((section) => !String(section.id || '').startsWith('custom-'))
+      .forEach((section) => {
+        const node = document.getElementById(section.id);
+        if (node) {
+          main.insertBefore(node, footer);
+        }
+      });
+  }
+
+  sections.forEach((section) => {
+    const isCustom = String(section.id || '').startsWith('custom-');
+    if (isCustom) {
+      if (!section.enabled || !main || !footer) return;
+      const custom = document.createElement('section');
+      custom.className = 'section custom-layout-section';
+      custom.innerHTML = `
+        <div class="container">
+          <div class="section-header">
+            <p class="section-label">${section.caption || 'Section'}</p>
+            <h2>${section.title || section.label || 'Custom Section'}</h2>
+            <p>${section.text || ''}</p>
+          </div>
+        </div>
+      `;
+      main.insertBefore(custom, footer);
+      return;
+    }
+
+    const node = document.getElementById(section.id);
+    if (!node) return;
+    node.style.display = section.enabled ? '' : 'none';
+
+    if (section.id === 'hero') {
+      const titleNode = node.querySelector('h1');
+      const textNode = node.querySelector('.hero-copy');
+      if (titleNode && section.title) titleNode.textContent = section.title;
+      if (textNode && section.text) textNode.textContent = section.text;
+      return;
+    }
+
+    const labelNode = node.querySelector('.section-label');
+    const titleNode = node.querySelector('.section-header h2');
+    const textNode = node.querySelector('.section-header > p');
+    if (labelNode && section.caption) labelNode.textContent = section.caption;
+    if (titleNode && section.title) titleNode.textContent = section.title;
+    if (textNode && section.text) textNode.textContent = section.text;
+  });
+}
+
+function renderDestinations(adminData) {
+  const items = Array.isArray(adminData?.destinations) ? adminData.destinations : [];
+  const grid = document.querySelector('#destinations .dest-grid');
+  if (!grid || !items.length) return;
+
+  const activeItems = items.filter((item) => (item.status || 'Active') === 'Active');
+  if (!activeItems.length) return;
+
+  grid.innerHTML = '';
+  activeItems.slice(0, 8).forEach((item) => {
+    const card = document.createElement('article');
+    card.className = 'destination-card';
+    card.innerHTML = `
+      <img src="${item.image || 'https://via.placeholder.com/800x600?text=Destination'}" alt="${item.name || 'Destination'}" />
+      <div>
+        <h3>${item.name || 'Destination'}</h3>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
 function createPackageCard(trip) {
+  const slug = trip.slug || slugify(trip.title);
   const article = document.createElement('article');
   article.className = 'package-card';
   article.innerHTML = `
@@ -88,7 +237,7 @@ function createPackageCard(trip) {
         <span>${trip.duration || trip.groupSize || 'N/A'}</span>
         <span class="price">$${trip.price ?? 0} / person</span>
       </div>
-      <a href="#destinations" class="card-cta">View Details</a>
+      <a href="trip.html?slug=${encodeURIComponent(slug)}" class="card-cta">View Details</a>
     </div>
   `;
   return article;
@@ -99,6 +248,14 @@ async function renderAdminPackages() {
   if (!grid) return;
 
   const dbConfig = resolveSupabaseConfig();
+  const adminData = loadAdminData();
+  const layout = resolveLayout(adminData);
+
+  applyHeaderMenu(layout);
+  applyHeroImages(layout);
+  applySectionLayout(layout);
+  renderDestinations(adminData);
+
   let adminTrips = [];
 
   // Keep homepage data source consistent with admin setup: Supabase only when enabled.
@@ -111,12 +268,17 @@ async function renderAdminPackages() {
   }
 
   if (!adminTrips.length) {
-    adminTrips = loadAdminTrips();
+    adminTrips = loadAdminTrips(adminData);
   }
 
   if (!adminTrips.length) return;
+  const columns = Number(layout?.packageGrid?.columns || 4);
+  const rows = Number(layout?.packageGrid?.rows || 2);
+  const total = Math.max(1, columns) * Math.max(1, rows);
+
   grid.innerHTML = '';
-  adminTrips.slice(0, 8).forEach((trip) => grid.appendChild(createPackageCard(trip)));
+  grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
+  adminTrips.slice(0, total).forEach((trip) => grid.appendChild(createPackageCard(trip)));
 }
 
 window.addEventListener('load', renderAdminPackages);

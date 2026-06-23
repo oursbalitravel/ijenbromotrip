@@ -4,6 +4,38 @@ import { createClient } from '@supabase/supabase-js';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const STORAGE_KEY = 'ijen-bromo-admin-data';
 const DB_CONFIG_KEY = 'ijen-bromo-db-config';
+
+function slugify(text) {
+  return (text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-') || 'trip-package';
+}
+
+const defaultLayout = {
+  packageGrid: { columns: 4, rows: 2 },
+  headerMenu: [
+    { id: crypto.randomUUID(), label: 'Home', href: '#hero' },
+    { id: crypto.randomUUID(), label: 'Trip Package', href: '#packages' },
+    { id: crypto.randomUUID(), label: 'Trip Destination', href: '#destinations' },
+    { id: crypto.randomUUID(), label: 'Why Choose Us', href: '#why-us' },
+    { id: crypto.randomUUID(), label: 'Blog', href: '#blog' },
+  ],
+  sections: [
+    { id: 'hero', label: 'Hero', enabled: true, caption: 'Hero', title: 'Your world of joy', text: 'From local escapes to far-flung adventures, find what makes you happy anytime, anywhere.' },
+    { id: 'packages', label: 'Trip Package', enabled: true, caption: 'Popular Ijen Bromo Packages', title: 'Best Ijen Bromo Tour Packages', text: 'Handpicked tours to explore Mount Ijen, Mount Bromo, and East Java waterfalls.' },
+    { id: 'destinations', label: 'Trip Destination', enabled: true, caption: 'Explore East Java', title: 'Explore Top Destinations in East Java', text: '' },
+    { id: 'why-us', label: 'Why Choose Us', enabled: true, caption: 'Why Us', title: 'Why Choose Ijen Bromo Trip?', text: '' },
+    { id: 'book', label: 'CTA', enabled: true, caption: 'Ready to explore?', title: 'Plan Your Ijen Bromo Adventure Today', text: '' },
+    { id: 'blog', label: 'Blog', enabled: true, caption: 'Travel Tips', title: 'Travel Guide & Tips for Ijen Bromo', text: '' },
+    { id: 'faq', label: 'FAQ', enabled: true, caption: 'Questions?', title: 'Frequently Asked Questions about Ijen Bromo Tour', text: '' },
+  ],
+  heroImages: [],
+  footerText: '© 2014–2026 IjenBromoTrip',
+};
+
 const defaultState = {
   trips: [
     {
@@ -46,6 +78,23 @@ const defaultState = {
     email: 'support@ijenbromotrip.com',
     logo: '',
   },
+  destinations: [
+    {
+      id: crypto.randomUUID(),
+      name: 'Mount Ijen',
+      summary: 'Witness iconic blue fire and sunrise at Ijen crater.',
+      image: 'https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?auto=format&fit=crop&w=800&q=80',
+      status: 'Active',
+    },
+    {
+      id: crypto.randomUUID(),
+      name: 'Mount Bromo',
+      summary: 'Sunrise jeep tour over the Sea of Sand and crater rim.',
+      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
+      status: 'Active',
+    },
+  ],
+  layout: defaultLayout,
   users: 1240,
   bookings: 820,
   revenue: 45230,
@@ -177,7 +226,23 @@ function loadStorage() {
   if (!raw) return defaultState;
 
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return {
+      ...defaultState,
+      ...parsed,
+      settings: { ...defaultState.settings, ...(parsed?.settings || {}) },
+      layout: {
+        ...defaultLayout,
+        ...(parsed?.layout || {}),
+        packageGrid: {
+          ...defaultLayout.packageGrid,
+          ...(parsed?.layout?.packageGrid || {}),
+        },
+        headerMenu: Array.isArray(parsed?.layout?.headerMenu) ? parsed.layout.headerMenu : defaultLayout.headerMenu,
+        sections: Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : defaultLayout.sections,
+      },
+      destinations: Array.isArray(parsed?.destinations) ? parsed.destinations : defaultState.destinations,
+    };
   } catch {
     return defaultState;
   }
@@ -247,6 +312,7 @@ function formatSupabaseError(error) {
 function mapTripRowToState(row) {
   return {
     id: row.id,
+    slug: slugify(row.slug || row.title || ''),
     title: row.title || '',
     overview: row.overview || '',
     description: row.description || '',
@@ -443,8 +509,9 @@ function Sidebar({ active, onSelect, settings }) {
   const menu = [
     { key: 'dashboard', label: 'Dashboard', icon: '📊' },
     { key: 'trips', label: 'Trip', icon: '🧳' },
+    { key: 'layout', label: 'Layout', icon: '🧱' },
     { key: 'services', label: 'Extra Service', icon: '✨' },
-    { key: 'setup', label: 'Setup', icon: '⚙️' },
+    { key: 'setup', label: 'Setting', icon: '⚙️' },
   ];
 
   return (
@@ -518,76 +585,173 @@ function SectionHeader({ title, description, actions }) {
   );
 }
 
-function TripsView({ data, onAdd, onEdit, onDelete, onNotify }) {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formData, setFormData] = useState(null);
+function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDeleteDestination, onNotify }) {
+  const [tab, setTab] = useState('packages');
+  const [isTripFormOpen, setIsTripFormOpen] = useState(false);
+  const [tripFormData, setTripFormData] = useState(null);
+  const [isDestinationFormOpen, setIsDestinationFormOpen] = useState(false);
+  const [destinationFormData, setDestinationFormData] = useState(null);
 
-  const openNew = () => {
-    setFormData(null);
-    setIsFormOpen(true);
+  const openNewTrip = () => {
+    setTripFormData(null);
+    setIsTripFormOpen(true);
   };
 
-  const openEdit = (trip) => {
-    setFormData(trip);
-    setIsFormOpen(true);
+  const openEditTrip = (trip) => {
+    setTripFormData(trip);
+    setIsTripFormOpen(true);
+  };
+
+  const openNewDestination = () => {
+    setDestinationFormData(null);
+    setIsDestinationFormOpen(true);
+  };
+
+  const openEditDestination = (destination) => {
+    setDestinationFormData(destination);
+    setIsDestinationFormOpen(true);
   };
 
   return (
     <div className="page-panel">
       <SectionHeader
-        title="Trips"
-        description="Manage Trip Packages"
-        actions={<button type="button" className="primary-btn" onClick={openNew}>+ Add New Trip</button>}
+        title="Trip"
+        description={tab === 'packages' ? 'Manage Trip Package' : 'Manage Destinations'}
+        actions={(
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={tab === 'packages' ? openNewTrip : openNewDestination}
+          >
+            {tab === 'packages' ? '+ Add New Trip Package' : '+ Add New Destination'}
+          </button>
+        )}
       />
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Image</th>
-              <th>Title</th>
-              <th>Duration</th>
-              <th>Price</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.trips.map((trip) => (
-              <tr key={trip.id}>
-                <td>
-                  <div className="thumb-cell">
-                    <img src={trip.images[0] || 'https://via.placeholder.com/120x90?text=Trip'} alt={trip.title} />
-                  </div>
-                </td>
-                <td>{trip.title}</td>
-                <td>{trip.duration}</td>
-                <td>${trip.price}</td>
-                <td>{trip.status}</td>
-                <td>
-                  <div className="action-group">
-                    <button className="text-btn" onClick={() => openEdit(trip)}>Edit</button>
-                    <button className="text-btn text-btn-danger" onClick={() => onDelete(trip.id)}>Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {data.trips.length === 0 && (
-              <tr>
-                <td colSpan="6" className="empty-row">No trips available yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+
+      <div className="button-row" style={{ marginBottom: 16 }}>
+        <button
+          type="button"
+          className={classNames('secondary-btn', tab === 'packages' && 'active-tab-btn')}
+          onClick={() => setTab('packages')}
+        >
+          Tab 1 - Trip Package
+        </button>
+        <button
+          type="button"
+          className={classNames('secondary-btn', tab === 'destinations' && 'active-tab-btn')}
+          onClick={() => setTab('destinations')}
+        >
+          Tab 2 - Destinasi
+        </button>
       </div>
-      {isFormOpen && (
+
+      {tab === 'packages' && (
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Title</th>
+                <th>Slug</th>
+                <th>Duration</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.trips.map((trip) => (
+                <tr key={trip.id}>
+                  <td>
+                    <div className="thumb-cell">
+                      <img src={trip.images?.[0] || 'https://via.placeholder.com/120x90?text=Trip'} alt={trip.title} />
+                    </div>
+                  </td>
+                  <td>{trip.title}</td>
+                  <td>{trip.slug || slugify(trip.title)}</td>
+                  <td>{trip.duration}</td>
+                  <td>${trip.price}</td>
+                  <td>{trip.status}</td>
+                  <td>
+                    <div className="action-group">
+                      <button className="text-btn" onClick={() => openEditTrip(trip)}>Edit</button>
+                      <button className="text-btn text-btn-danger" onClick={() => onDeleteTrip(trip.id)}>Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {data.trips.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="empty-row">No trip packages available yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'destinations' && (
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Photo</th>
+                <th>Destination</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.destinations.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <div className="thumb-cell">
+                      <img src={item.image || 'https://via.placeholder.com/120x90?text=Destination'} alt={item.name} />
+                    </div>
+                  </td>
+                  <td>{item.name}</td>
+                  <td>{item.summary}</td>
+                  <td>{item.status}</td>
+                  <td>
+                    <div className="action-group">
+                      <button className="text-btn" onClick={() => openEditDestination(item)}>Edit</button>
+                      <button className="text-btn text-btn-danger" onClick={() => onDeleteDestination(item.id)}>Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {data.destinations.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="empty-row">No destinations available yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {isTripFormOpen && (
         <TripForm
-          existing={formData}
+          existing={tripFormData}
           onSave={(trip, isUpdate) => {
-            onAdd(trip, isUpdate);
-            setIsFormOpen(false);
-            onNotify(isUpdate ? 'Package has been updated successfully' : 'New package has been added successfully', 'success');
+            onSaveTrip(trip, isUpdate);
+            setIsTripFormOpen(false);
+            onNotify(isUpdate ? 'Trip package updated successfully' : 'Trip package added successfully', 'success');
           }}
-          onCancel={() => setIsFormOpen(false)}
+          onCancel={() => setIsTripFormOpen(false)}
+        />
+      )}
+
+      {isDestinationFormOpen && (
+        <DestinationForm
+          existing={destinationFormData}
+          onSave={(destination, isUpdate) => {
+            onSaveDestination(destination, isUpdate);
+            setIsDestinationFormOpen(false);
+            onNotify(isUpdate ? 'Destination updated successfully' : 'Destination added successfully', 'success');
+          }}
+          onCancel={() => setIsDestinationFormOpen(false)}
         />
       )}
     </div>
@@ -778,6 +942,7 @@ function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPul
 function TripForm({ existing, onSave, onCancel }) {
   const emptyTrip = {
     id: crypto.randomUUID(),
+    slug: '',
     title: '',
     overview: '',
     description: '',
@@ -864,7 +1029,7 @@ function TripForm({ existing, onSave, onCancel }) {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSave(form, Boolean(existing));
+    onSave({ ...form, slug: slugify(form.slug || form.title) }, Boolean(existing));
   };
 
   return (
@@ -884,6 +1049,10 @@ function TripForm({ existing, onSave, onCancel }) {
               <label>
                 Package Name
                 <input value={form.title} onChange={(e) => update('title', e.target.value)} required />
+              </label>
+              <label>
+                Slug URL
+                <input value={form.slug || ''} onChange={(e) => update('slug', slugify(e.target.value))} placeholder="auto from title" />
               </label>
               <label>
                 Duration
@@ -1045,6 +1214,287 @@ function TripForm({ existing, onSave, onCancel }) {
   );
 }
 
+function DestinationForm({ existing, onSave, onCancel }) {
+  const emptyDestination = {
+    id: crypto.randomUUID(),
+    name: '',
+    summary: '',
+    image: '',
+    status: 'Active',
+  };
+
+  const [form, setForm] = useState(existing || emptyDestination);
+
+  useEffect(() => {
+    setForm(existing || emptyDestination);
+  }, [existing]);
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+    const url = await convertImageToWebp(file);
+    setForm((prev) => ({ ...prev, image: url }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSave(form, Boolean(existing));
+  };
+
+  return (
+    <div className="overlay-panel">
+      <div className="modal-card">
+        <div className="modal-header">
+          <div>
+            <p className="section-label">{existing ? 'Edit Destination' : 'Add Destination'}</p>
+            <h2>{existing ? 'Update destination' : 'Create new destination'}</h2>
+          </div>
+          <button type="button" className="close-btn" onClick={onCancel}>×</button>
+        </div>
+        <form className="form-card" onSubmit={handleSubmit}>
+          <div className="form-grid-2">
+            <label>
+              Destination Name
+              <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} required />
+            </label>
+            <label>
+              Status
+              <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Description
+            <textarea value={form.summary} onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))} rows="4" required />
+          </label>
+          <label className="upload-input">
+            Upload photo (1 image)
+            <input type="file" accept="image/*" onChange={(e) => handleUpload(e.target.files?.[0])} />
+          </label>
+          {form.image && (
+            <div className="thumb-cell" style={{ width: 180, height: 120 }}>
+              <img src={form.image} alt={form.name || 'Destination preview'} />
+            </div>
+          )}
+          <div className="form-actions form-actions-end">
+            <button type="button" className="ghost-btn" onClick={onCancel}>Cancel</button>
+            <button className="primary-btn" type="submit">Save Destination</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function LayoutView({ layout, onSave, onNotify }) {
+  const [form, setForm] = useState(layout || defaultLayout);
+
+  useEffect(() => {
+    setForm(layout || defaultLayout);
+  }, [layout]);
+
+  const updateGrid = (key, value) => {
+    const num = Number(value);
+    setForm((prev) => ({
+      ...prev,
+      packageGrid: {
+        ...prev.packageGrid,
+        [key]: Number.isNaN(num) ? prev.packageGrid[key] : Math.max(1, Math.min(4, num)),
+      },
+    }));
+  };
+
+  const updateSection = (id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      sections: prev.sections.map((section) => (section.id === id ? { ...section, [key]: value } : section)),
+    }));
+  };
+
+  const moveSection = (index, direction) => {
+    setForm((prev) => {
+      const next = [...prev.sections];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...prev, sections: next };
+    });
+  };
+
+  const addCustomSection = () => {
+    setForm((prev) => ({
+      ...prev,
+      sections: [
+        ...prev.sections,
+        {
+          id: `custom-${crypto.randomUUID()}`,
+          label: 'Custom Section',
+          enabled: true,
+          caption: 'Custom',
+          title: 'New custom section',
+          text: 'Add your section content here.',
+        },
+      ],
+    }));
+  };
+
+  const removeCustomSection = (id) => {
+    setForm((prev) => ({
+      ...prev,
+      sections: prev.sections.filter((section) => section.id !== id),
+    }));
+  };
+
+  const updateHeaderMenu = (id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      headerMenu: prev.headerMenu.map((item) => (item.id === id ? { ...item, [key]: value } : item)),
+    }));
+  };
+
+  const addHeaderMenu = () => {
+    setForm((prev) => ({
+      ...prev,
+      headerMenu: [...prev.headerMenu, { id: crypto.randomUUID(), label: 'New Menu', href: '#hero' }],
+    }));
+  };
+
+  const removeHeaderMenu = (id) => {
+    setForm((prev) => ({ ...prev, headerMenu: prev.headerMenu.filter((item) => item.id !== id) }));
+  };
+
+  const handleHeroImageUpload = async (files) => {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    const converted = await Promise.all(list.map(convertImageToWebp));
+    setForm((prev) => ({ ...prev, heroImages: converted.slice(0, 5) }));
+  };
+
+  const handleSave = () => {
+    onSave(form);
+    onNotify('Layout setting saved successfully', 'success');
+  };
+
+  return (
+    <div className="page-panel">
+      <SectionHeader title="Layout" description="Setup homepage structure and content" />
+
+      <div className="form-card">
+        <div className="form-section">
+          <h3>Header Menu</h3>
+          {form.headerMenu.map((item) => (
+            <div key={item.id} className="form-grid-2" style={{ marginBottom: 12 }}>
+              <label>
+                Menu label
+                <input value={item.label} onChange={(e) => updateHeaderMenu(item.id, 'label', e.target.value)} />
+              </label>
+              <label>
+                Link target
+                <input value={item.href} onChange={(e) => updateHeaderMenu(item.id, 'href', e.target.value)} placeholder="#packages or trip.html" />
+              </label>
+              <button type="button" className="text-btn text-btn-danger" onClick={() => removeHeaderMenu(item.id)}>Delete menu</button>
+            </div>
+          ))}
+          <button type="button" className="secondary-btn" onClick={addHeaderMenu}>+ Add header menu</button>
+        </div>
+
+        <div className="form-section">
+          <h3>Hero</h3>
+          <label className="upload-input">
+            Upload hero photos (max 5)
+            <input type="file" accept="image/*" multiple onChange={(e) => handleHeroImageUpload(e.target.files)} />
+          </label>
+          {!!form.heroImages?.length && (
+            <div className="image-preview-grid">
+              {form.heroImages.map((src, idx) => (
+                <div className="preview-item" key={`${idx}-${src.slice(0, 20)}`}>
+                  <img src={src} alt={`Hero ${idx + 1}`} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="form-section">
+          <h3>Trip Package Grid</h3>
+          <div className="form-grid-2">
+            <label>
+              Columns
+              <input type="number" min="1" max="4" value={form.packageGrid?.columns || 4} onChange={(e) => updateGrid('columns', e.target.value)} />
+            </label>
+            <label>
+              Rows
+              <input type="number" min="1" max="4" value={form.packageGrid?.rows || 2} onChange={(e) => updateGrid('rows', e.target.value)} />
+            </label>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <h3>Sections (edit, add, delete)</h3>
+          {form.sections.map((section, index) => {
+            const isCustom = section.id.startsWith('custom-');
+            return (
+              <div key={section.id} className="form-section" style={{ marginBottom: 14 }}>
+                <div className="button-row" style={{ justifyContent: 'space-between' }}>
+                  <strong>{section.label || section.id}</strong>
+                  <div className="button-row">
+                    <button type="button" className="secondary-btn" onClick={() => moveSection(index, -1)}>↑</button>
+                    <button type="button" className="secondary-btn" onClick={() => moveSection(index, 1)}>↓</button>
+                    {isCustom && (
+                      <button type="button" className="text-btn text-btn-danger" onClick={() => removeCustomSection(section.id)}>Delete</button>
+                    )}
+                  </div>
+                </div>
+                <div className="form-grid-2">
+                  <label>
+                    Section Label
+                    <input value={section.label || ''} onChange={(e) => updateSection(section.id, 'label', e.target.value)} />
+                  </label>
+                  <label>
+                    Caption
+                    <input value={section.caption || ''} onChange={(e) => updateSection(section.id, 'caption', e.target.value)} />
+                  </label>
+                  <label>
+                    Title
+                    <input value={section.title || ''} onChange={(e) => updateSection(section.id, 'title', e.target.value)} />
+                  </label>
+                  <label>
+                    Enabled
+                    <select value={section.enabled ? 'yes' : 'no'} onChange={(e) => updateSection(section.id, 'enabled', e.target.value === 'yes')}>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Text
+                  <textarea rows="3" value={section.text || ''} onChange={(e) => updateSection(section.id, 'text', e.target.value)} />
+                </label>
+              </div>
+            );
+          })}
+          <div className="button-row">
+            <button type="button" className="secondary-btn" onClick={addCustomSection}>+ Add custom section</button>
+          </div>
+        </div>
+
+        <div className="form-section">
+          <h3>Footer</h3>
+          <label>
+            Footer text
+            <input value={form.footerText || ''} onChange={(e) => setForm((prev) => ({ ...prev, footerText: e.target.value }))} />
+          </label>
+        </div>
+
+        <div className="form-actions form-actions-end">
+          <button type="button" className="primary-btn" onClick={handleSave}>Save Layout</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ServiceForm({ existing, onSave, onCancel }) {
   const emptyService = { id: crypto.randomUUID(), name: '', type: 'Per Pax', price: 0, status: 'Active' };
   const [form, setForm] = useState(existing || emptyService);
@@ -1192,11 +1642,16 @@ function App() {
   }, [data, dbConfig]);
 
   const handleAddOrUpdateTrip = (trip, isUpdate) => {
+    const normalizedTrip = {
+      ...trip,
+      slug: slugify(trip.slug || trip.title),
+    };
+
     setData((prev) => ({
       ...prev,
       trips: isUpdate
-        ? prev.trips.map((item) => (item.id === trip.id ? trip : item))
-        : [trip, ...prev.trips],
+        ? prev.trips.map((item) => (item.id === normalizedTrip.id ? normalizedTrip : item))
+        : [normalizedTrip, ...prev.trips],
     }));
   };
 
@@ -1221,6 +1676,27 @@ function App() {
 
   const handleSaveSettings = (settings) => {
     setData((prev) => ({ ...prev, settings }));
+  };
+
+  const handleSaveDestination = (destination, isUpdate) => {
+    setData((prev) => ({
+      ...prev,
+      destinations: isUpdate
+        ? prev.destinations.map((item) => (item.id === destination.id ? destination : item))
+        : [destination, ...prev.destinations],
+    }));
+  };
+
+  const handleDeleteDestination = (id) => {
+    setData((prev) => ({
+      ...prev,
+      destinations: prev.destinations.filter((item) => item.id !== id),
+    }));
+    notify('Destination deleted successfully', 'success');
+  };
+
+  const handleSaveLayout = (layout) => {
+    setData((prev) => ({ ...prev, layout }));
   };
 
   const handleSaveDbSettings = (config) => {
@@ -1323,7 +1799,9 @@ function App() {
 
   const handleImportFromHomepage = () => {
     const existingIds = new Set(data.trips.map((t) => t.id));
-    const newTrips = homepageDefaultTrips.filter((t) => !existingIds.has(t.id));
+    const newTrips = homepageDefaultTrips
+      .filter((t) => !existingIds.has(t.id))
+      .map((trip) => ({ ...trip, slug: slugify(trip.title) }));
     if (!newTrips.length) {
       notify('Homepage packages are already imported.', 'success');
       return;
@@ -1360,7 +1838,7 @@ function App() {
           if (header.includes('duration') && header.includes('title')) {
             const trips = rows.map((cols) => {
               const row = Object.fromEntries(header.map((key, i) => [key, cols[i]?.replace(/"/g, '').trim()]));
-              return { id: crypto.randomUUID(), title: row.title || '', duration: row.duration || '', price: Number(row.price || 0), status: row.status || 'Active', vehicle: row.vehicle || '', groupSize: row['group size'] || '', bestTime: row['best time'] || '', overview: '', description: '', highlights: [''], images: [], itinerary: [], faqs: [] };
+              return { id: crypto.randomUUID(), slug: slugify(row.title || ''), title: row.title || '', duration: row.duration || '', price: Number(row.price || 0), status: row.status || 'Active', vehicle: row.vehicle || '', groupSize: row['group size'] || '', bestTime: row['best time'] || '', overview: '', description: '', highlights: [''], images: [], itinerary: [], faqs: [] };
             });
             setData((prev) => ({ ...prev, trips: [...prev.trips, ...trips] }));
             notify('Trip CSV imported successfully', 'success');
@@ -1387,7 +1865,19 @@ function App() {
       return <DashboardPanel data={data} />;
     }
     if (activePage === 'trips') {
-      return <TripsView data={data} onAdd={handleAddOrUpdateTrip} onDelete={handleDeleteTrip} onNotify={notify} />;
+      return (
+        <TripsView
+          data={data}
+          onSaveTrip={handleAddOrUpdateTrip}
+          onDeleteTrip={handleDeleteTrip}
+          onSaveDestination={handleSaveDestination}
+          onDeleteDestination={handleDeleteDestination}
+          onNotify={notify}
+        />
+      );
+    }
+    if (activePage === 'layout') {
+      return <LayoutView layout={data.layout} onSave={handleSaveLayout} onNotify={notify} />;
     }
     if (activePage === 'services') {
       return <ServicesView data={data} onSave={handleSaveService} onDelete={handleDeleteService} onNotify={notify} />;
