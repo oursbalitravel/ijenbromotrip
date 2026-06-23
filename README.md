@@ -33,6 +33,18 @@ git push -u origin main
 
 ## Supabase Sync (Semua Pengunjung)
 
+### 0) Catatan Penting
+- **Jika table `destinations` sudah ada**: Jalankan SQL ALTER di bawah untuk tambah kolom baru (description, images, highlights, faqs):
+```sql
+-- Tambah kolom jika belum ada
+alter table public.destinations
+add column if not exists description text not null default '',
+add column if not exists images jsonb not null default '[]'::jsonb,
+add column if not exists highlights jsonb not null default '[]'::jsonb,
+add column if not exists faqs jsonb not null default '[]'::jsonb;
+```
+- **Jika table belum ada**: Gunakan SQL CREATE di step 1, sudah termasuk semua field baru.
+
 ### 1) Buat tabel di Supabase SQL Editor
 ```sql
 create table if not exists public.trips (
@@ -68,7 +80,11 @@ create table if not exists public.destinations (
    slug text not null default '',
    name text not null,
    summary text not null default '',
+   description text not null default '',
    image text not null default '',
+   images jsonb not null default '[]'::jsonb,
+   highlights jsonb not null default '[]'::jsonb,
+   faqs jsonb not null default '[]'::jsonb,
    status text not null default 'Active',
    enabled boolean not null default true,
    updated_at timestamptz not null default now()
