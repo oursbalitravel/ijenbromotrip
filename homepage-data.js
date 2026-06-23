@@ -7,25 +7,25 @@ function sanitizeUrl(url) {
 
 function resolveSupabaseConfig() {
   if (typeof window === 'undefined') {
-    return { url: '', anonKey: '' };
+    return { url: '', anonKey: '', enabled: false };
   }
 
   try {
     const raw = window.localStorage.getItem(DB_CONFIG_KEY);
-    if (!raw) return { url: '', anonKey: '' };
+    if (!raw) return { url: '', anonKey: '', enabled: false };
 
     const parsed = JSON.parse(raw);
     return {
       url: sanitizeUrl(parsed?.url),
       anonKey: (parsed?.anonKey || '').trim(),
+      enabled: Boolean(parsed?.enabled),
     };
   } catch {
-    return { url: '', anonKey: '' };
+    return { url: '', anonKey: '', enabled: false };
   }
 }
 
-async function loadTripsFromSupabase() {
-  const config = resolveSupabaseConfig();
+async function loadTripsFromSupabase(config) {
   if (!config.url || !config.anonKey) return [];
 
   const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs&order=updated_at.desc`;
@@ -98,12 +98,16 @@ async function renderAdminPackages() {
   const grid = document.getElementById('packages-grid');
   if (!grid) return;
 
+  const dbConfig = resolveSupabaseConfig();
   let adminTrips = [];
-  try {
-    adminTrips = await loadTripsFromSupabase();
-  } catch (error) {
-    // Fallback for local development or missing shared DB config.
-    adminTrips = [];
+
+  // Keep homepage data source consistent with admin setup: Supabase only when enabled.
+  if (dbConfig.enabled && dbConfig.url && dbConfig.anonKey) {
+    try {
+      adminTrips = await loadTripsFromSupabase(dbConfig);
+    } catch (error) {
+      adminTrips = [];
+    }
   }
 
   if (!adminTrips.length) {
