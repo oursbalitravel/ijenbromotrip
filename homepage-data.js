@@ -260,6 +260,43 @@ function renderDestinations(adminData) {
   });
 }
 
+function renderWhyChoose(layout) {
+  const grid = document.querySelector('#why-us .features-grid');
+  const items = Array.isArray(layout?.whyChooseItems) ? layout.whyChooseItems : [];
+  if (!grid || !items.length) return;
+
+  const activeItems = items.filter((item) => item.enabled !== false);
+  grid.innerHTML = '';
+
+  activeItems.forEach((item) => {
+    const card = document.createElement('article');
+    card.className = 'feature-card';
+    card.innerHTML = `
+      <h3>${item.title || 'Feature'}</h3>
+      <p>${item.text || ''}</p>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function renderFaq(layout) {
+  const list = document.querySelector('#faq .faq-list');
+  const items = Array.isArray(layout?.faqItems) ? layout.faqItems : [];
+  if (!list || !items.length) return;
+
+  const activeItems = items.filter((item) => item.enabled !== false);
+  list.innerHTML = '';
+
+  activeItems.forEach((item) => {
+    const block = document.createElement('details');
+    block.innerHTML = `
+      <summary>${item.question || 'Question'}</summary>
+      <p>${item.answer || ''}</p>
+    `;
+    list.appendChild(block);
+  });
+}
+
 function createPackageCard(trip) {
   const slug = trip.slug || slugify(trip.title);
   const article = document.createElement('article');
@@ -292,6 +329,8 @@ async function renderAdminPackages() {
   applyHeroImages(layout);
   applySectionLayout(layout);
   renderDestinations(adminData);
+  renderWhyChoose(layout);
+  renderFaq(layout);
 
   // Clear initial hardcoded cards so homepage never silently falls back to old static content.
   grid.innerHTML = '';

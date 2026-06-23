@@ -37,6 +37,18 @@ const defaultLayout = {
     { id: 'blog', label: 'Blog', enabled: true, caption: 'Travel Tips', title: 'Travel Guide & Tips for Ijen Bromo', text: '' },
     { id: 'faq', label: 'FAQ', enabled: true, caption: 'Questions?', title: 'Frequently Asked Questions about Ijen Bromo Tour', text: '' },
   ],
+  whyChooseItems: [
+    { id: crypto.randomUUID(), title: 'Local expert guides', text: 'Trust experienced guides who know the trails, culture, and hidden viewpoints.', enabled: true },
+    { id: crypto.randomUUID(), title: 'Affordable pricing', text: 'Get great value with transparent package pricing and no hidden costs.', enabled: true },
+    { id: crypto.randomUUID(), title: 'Flexible booking', text: 'Choose dates, group size, and itinerary options that suit your travel style.', enabled: true },
+    { id: crypto.randomUUID(), title: 'Trusted by travelers', text: 'Highly-rated tours and glowing reviews from visitors across the globe.', enabled: true },
+  ],
+  faqItems: [
+    { id: crypto.randomUUID(), question: 'How to go to Mount Ijen from Bali?', answer: 'Most travelers take a ferry to Java and continue by car or transfer service to Ketapang, then on to Banyuwangi near Ijen.', enabled: true },
+    { id: crypto.randomUUID(), question: 'What is the best time to visit Bromo?', answer: 'The best time is during the dry season from April to October for clearer skies and cooler mornings.', enabled: true },
+    { id: crypto.randomUUID(), question: 'Is Ijen safe for beginners?', answer: 'Yes, with a guide and proper preparation, Ijen is accessible for first-time hikers.', enabled: true },
+    { id: crypto.randomUUID(), question: 'How many days for Ijen Bromo tour?', answer: 'A 2-3 day itinerary lets you visit both Ijen and Bromo comfortably with time for waterfalls.', enabled: true },
+  ],
   heroImages: [],
   footerText: '© 2014–2026 IjenBromoTrip',
 };
@@ -246,6 +258,8 @@ function loadStorage() {
         headerMenu: Array.isArray(parsed?.layout?.headerMenu) ? parsed.layout.headerMenu : defaultLayout.headerMenu,
         footerMenu: Array.isArray(parsed?.layout?.footerMenu) ? parsed.layout.footerMenu : defaultLayout.footerMenu,
         sections: Array.isArray(parsed?.layout?.sections) ? parsed.layout.sections : defaultLayout.sections,
+        whyChooseItems: Array.isArray(parsed?.layout?.whyChooseItems) ? parsed.layout.whyChooseItems : defaultLayout.whyChooseItems,
+        faqItems: Array.isArray(parsed?.layout?.faqItems) ? parsed.layout.faqItems : defaultLayout.faqItems,
       },
       destinations: Array.isArray(parsed?.destinations) ? parsed.destinations : defaultState.destinations,
     };
@@ -1398,6 +1412,54 @@ function LayoutView({ layout, onSave, onNotify }) {
     setForm((prev) => ({ ...prev, heroImages: converted.slice(0, 5) }));
   };
 
+  const updateWhyChooseItem = (id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      whyChooseItems: (prev.whyChooseItems || []).map((item) => (item.id === id ? { ...item, [key]: value } : item)),
+    }));
+  };
+
+  const addWhyChooseItem = () => {
+    setForm((prev) => ({
+      ...prev,
+      whyChooseItems: [
+        ...(prev.whyChooseItems || []),
+        { id: crypto.randomUUID(), title: 'New reason', text: 'Add reason text here.', enabled: true },
+      ],
+    }));
+  };
+
+  const removeWhyChooseItem = (id) => {
+    setForm((prev) => ({
+      ...prev,
+      whyChooseItems: (prev.whyChooseItems || []).filter((item) => item.id !== id),
+    }));
+  };
+
+  const updateFaqItem = (id, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      faqItems: (prev.faqItems || []).map((item) => (item.id === id ? { ...item, [key]: value } : item)),
+    }));
+  };
+
+  const addFaqItem = () => {
+    setForm((prev) => ({
+      ...prev,
+      faqItems: [
+        ...(prev.faqItems || []),
+        { id: crypto.randomUUID(), question: 'New question?', answer: 'Answer goes here.', enabled: true },
+      ],
+    }));
+  };
+
+  const removeFaqItem = (id) => {
+    setForm((prev) => ({
+      ...prev,
+      faqItems: (prev.faqItems || []).filter((item) => item.id !== id),
+    }));
+  };
+
   const handleSave = () => {
     onSave(form);
     onNotify('Layout setting saved successfully', 'success');
@@ -1461,6 +1523,8 @@ function LayoutView({ layout, onSave, onNotify }) {
           <h3>Sections (edit, add, delete)</h3>
           {form.sections.map((section, index) => {
             const isCustom = section.id.startsWith('custom-');
+            const isWhyUs = section.id === 'why-us';
+            const isFaq = section.id === 'faq';
             return (
               <div key={section.id} className="form-section" style={{ marginBottom: 14 }}>
                 <div className="button-row" style={{ justifyContent: 'space-between' }}>
@@ -1498,6 +1562,64 @@ function LayoutView({ layout, onSave, onNotify }) {
                   Text
                   <textarea rows="3" value={section.text || ''} onChange={(e) => updateSection(section.id, 'text', e.target.value)} />
                 </label>
+
+                {isWhyUs && (
+                  <div style={{ marginTop: 12 }}>
+                    <p className="section-label" style={{ marginBottom: 8 }}>Why Choose Us Items</p>
+                    {(form.whyChooseItems || []).map((item) => (
+                      <div key={item.id} className="form-section" style={{ marginBottom: 10 }}>
+                        <div className="form-grid-2">
+                          <label>
+                            Title
+                            <input value={item.title || ''} onChange={(e) => updateWhyChooseItem(item.id, 'title', e.target.value)} />
+                          </label>
+                          <label>
+                            Show on homepage
+                            <select value={item.enabled ? 'yes' : 'no'} onChange={(e) => updateWhyChooseItem(item.id, 'enabled', e.target.value === 'yes')}>
+                              <option value="yes">Show</option>
+                              <option value="no">Hide</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label>
+                          Description
+                          <textarea rows="2" value={item.text || ''} onChange={(e) => updateWhyChooseItem(item.id, 'text', e.target.value)} />
+                        </label>
+                        <button type="button" className="text-btn text-btn-danger" onClick={() => removeWhyChooseItem(item.id)}>Delete item</button>
+                      </div>
+                    ))}
+                    <button type="button" className="secondary-btn" onClick={addWhyChooseItem}>+ Add why choose item</button>
+                  </div>
+                )}
+
+                {isFaq && (
+                  <div style={{ marginTop: 12 }}>
+                    <p className="section-label" style={{ marginBottom: 8 }}>FAQ Items</p>
+                    {(form.faqItems || []).map((item) => (
+                      <div key={item.id} className="form-section" style={{ marginBottom: 10 }}>
+                        <div className="form-grid-2">
+                          <label>
+                            Question
+                            <input value={item.question || ''} onChange={(e) => updateFaqItem(item.id, 'question', e.target.value)} />
+                          </label>
+                          <label>
+                            Show on homepage
+                            <select value={item.enabled ? 'yes' : 'no'} onChange={(e) => updateFaqItem(item.id, 'enabled', e.target.value === 'yes')}>
+                              <option value="yes">Show</option>
+                              <option value="no">Hide</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label>
+                          Answer
+                          <textarea rows="3" value={item.answer || ''} onChange={(e) => updateFaqItem(item.id, 'answer', e.target.value)} />
+                        </label>
+                        <button type="button" className="text-btn text-btn-danger" onClick={() => removeFaqItem(item.id)}>Delete item</button>
+                      </div>
+                    ))}
+                    <button type="button" className="secondary-btn" onClick={addFaqItem}>+ Add FAQ item</button>
+                  </div>
+                )}
               </div>
             );
           })}
