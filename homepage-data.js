@@ -1,4 +1,66 @@
 const ADMIN_STORAGE_KEY = 'ijen-bromo-admin-data';
+const DB_CONFIG_KEY = 'ijen-bromo-db-config';
+
+function sanitizeUrl(url) {
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+function resolveSupabaseConfig() {
+  if (typeof window === 'undefined') {
+    return { url: '', anonKey: '' };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(DB_CONFIG_KEY);
+    if (!raw) return { url: '', anonKey: '' };
+
+    const parsed = JSON.parse(raw);
+    return {
+      url: sanitizeUrl(parsed?.url),
+      anonKey: (parsed?.anonKey || '').trim(),
+    };
+  } catch {
+    return { url: '', anonKey: '' };
+  }
+}
+
+async function loadTripsFromSupabase() {
+  const config = resolveSupabaseConfig();
+  if (!config.url || !config.anonKey) return [];
+
+  const endpoint = `${config.url}/rest/v1/trips?select=id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs&order=updated_at.desc`;
+  const response = await fetch(endpoint, {
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to fetch data from Supabase (HTTP ${response.status}).`);
+  }
+
+  const rows = await response.json();
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title || '',
+    overview: row.overview || '',
+    description: row.description || '',
+    vehicle: row.vehicle || '',
+    duration: row.duration || '',
+    groupSize: row.group_size || '',
+    bestTime: row.best_time || '',
+    price: Number(row.price ?? 0),
+    discount: Number(row.discount ?? 0),
+    status: row.status || 'Active',
+    images: Array.isArray(row.images) ? row.images : [],
+    highlights: Array.isArray(row.highlights) ? row.highlights : [],
+    itinerary: Array.isArray(row.itinerary) ? row.itinerary : [],
+    faqs: Array.isArray(row.faqs) ? row.faqs : [],
+  }));
+}
 
 function loadAdminTrips() {
   if (typeof window === 'undefined') return [];
@@ -35,7 +97,19 @@ function createPackageCard(trip) {
 async function renderAdminPackages() {
   const grid = document.getElementById('packages-grid');
   if (!grid) return;
-  const adminTrips = loadAdminTrips();
+
+  let adminTrips = [];
+  try {
+    adminTrips = await loadTripsFromSupabase();
+  } catch (error) {
+    // Fallback for local development or missing shared DB config.
+    adminTrips = [];
+  }
+
+  if (!adminTrips.length) {
+    adminTrips = loadAdminTrips();
+  }
+
   if (!adminTrips.length) return;
   grid.innerHTML = '';
   adminTrips.slice(0, 8).forEach((trip) => grid.appendChild(createPackageCard(trip)));

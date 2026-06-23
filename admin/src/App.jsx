@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const STORAGE_KEY = 'ijen-bromo-admin-data';
+const DB_CONFIG_KEY = 'ijen-bromo-db-config';
 const defaultState = {
   trips: [
     {
@@ -54,6 +56,121 @@ function saveStorage(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+const homepageDefaultTrips = [
+  {
+    id: 'homepage-trip-1',
+    title: 'Ijen Blue Fire Adventure',
+    overview: 'Experience the iconic blue flame and sunrise view with local expert guides.',
+    description: 'Witness the rare natural phenomenon of blue fire deep inside the Ijen crater, then enjoy a stunning sunrise above the acidic turquoise lake. Our experienced local guides ensure a safe and unforgettable journey.',
+    highlights: ['Blue fire trekking', 'Ijen crater sunrise', 'Acidic lake view', 'Local expert guide'],
+    vehicle: 'Jeep + Trek',
+    duration: '1D',
+    groupSize: '10 pax',
+    bestTime: 'Apr - Oct',
+    price: 120,
+    discount: 0,
+    status: 'Active',
+    images: ['https://images.unsplash.com/photo-1517832207067-4db24a2ae47c?auto=format&fit=crop&w=800&q=80'],
+    itinerary: [
+      { day: 'Day 1', items: [
+        { time: '23:00', activity: 'Pickup from hotel in Banyuwangi / Bondowoso' },
+        { time: '01:30', activity: 'Start trek to Ijen crater' },
+        { time: '02:30', activity: 'Arrive at crater, witness Blue Fire' },
+        { time: '05:00', activity: 'Sunrise view at crater rim' },
+        { time: '07:00', activity: 'Descend and return to hotel' },
+      ]},
+    ],
+    faqs: [
+      { question: 'What should I bring?', answer: 'Warm jacket, mask, sturdy shoes, headlamp, and water.' },
+      { question: 'Is it suitable for beginners?', answer: 'Yes, with a guide and moderate fitness it is accessible for most people.' },
+    ],
+  },
+  {
+    id: 'homepage-trip-2',
+    title: 'Mount Bromo Sunrise Trip',
+    overview: 'Catch sunrise over the volcanic crater and ride through the Sea of Sand.',
+    description: 'Rise before dawn for a 4WD jeep ride across the famous Sea of Sand, then hike to the Bromo viewpoint for a breathtaking sunrise. Descend to the crater rim and peer into the active volcano.',
+    highlights: ['4WD jeep ride', 'Sea of Sand crossing', 'Penanjakan sunrise viewpoint', 'Bromo crater visit'],
+    vehicle: 'Jeep',
+    duration: '1D',
+    groupSize: '6 pax',
+    bestTime: 'Apr - Oct',
+    price: 95,
+    discount: 0,
+    status: 'Active',
+    images: ['https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80'],
+    itinerary: [
+      { day: 'Day 1', items: [
+        { time: '03:00', activity: 'Pickup from hotel' },
+        { time: '04:00', activity: 'Jeep ride to Penanjakan viewpoint' },
+        { time: '05:00', activity: 'Sunrise viewing' },
+        { time: '07:00', activity: 'Drive across Sea of Sand to Bromo crater' },
+        { time: '09:00', activity: 'Return to hotel' },
+      ]},
+    ],
+    faqs: [
+      { question: 'Is transportation included?', answer: 'Yes, 4WD jeep from your hotel is included.' },
+    ],
+  },
+  {
+    id: 'homepage-trip-3',
+    title: 'Waterfalls of East Java',
+    overview: 'Discover Tumpak Sewu, Madakaripura, and hidden waterfall gems.',
+    description: 'Explore the most spectacular waterfalls of East Java in one day. Visit the iconic curtain waterfall Tumpak Sewu and the towering Madakaripura, set inside a narrow jungle canyon.',
+    highlights: ['Tumpak Sewu waterfall', 'Madakaripura canyon', 'Jungle trekking', 'Professional guide'],
+    vehicle: 'Minibus',
+    duration: '1D',
+    groupSize: '12 pax',
+    bestTime: 'May - Sep',
+    price: 135,
+    discount: 0,
+    status: 'Active',
+    images: ['https://images.unsplash.com/photo-1519648023493-d82b5f8d7cde?auto=format&fit=crop&w=800&q=80'],
+    itinerary: [
+      { day: 'Day 1', items: [
+        { time: '06:00', activity: 'Pickup from hotel' },
+        { time: '09:00', activity: 'Arrive Tumpak Sewu, trek to base' },
+        { time: '12:00', activity: 'Lunch at local warung' },
+        { time: '13:30', activity: 'Drive to Madakaripura waterfall' },
+        { time: '17:00', activity: 'Return to hotel' },
+      ]},
+    ],
+    faqs: [
+      { question: 'Do I need to swim?', answer: 'Light wading is needed inside Madakaripura canyon. Wear quick-dry clothes.' },
+    ],
+  },
+  {
+    id: 'homepage-trip-4',
+    title: 'Full Ijen Bromo Combo',
+    overview: 'A perfect 3-day itinerary covering both Ijen and Bromo highlights.',
+    description: 'The ultimate East Java volcanic experience: two full days covering Mount Ijen blue fire trek and Mount Bromo sunrise jeep tour, with comfortable hotel stays included.',
+    highlights: ['Ijen Blue Fire trek', 'Bromo sunrise & crater', 'Hotel accommodation', 'All transport included'],
+    vehicle: 'Jeep + Bus',
+    duration: '3D2N',
+    groupSize: '8 pax',
+    bestTime: 'Apr - Oct',
+    price: 210,
+    discount: 15,
+    status: 'Active',
+    images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80'],
+    itinerary: [
+      { day: 'Day 1', items: [{ time: '10:00', activity: 'Pickup and transfer to hotel Banyuwangi' }] },
+      { day: 'Day 2', items: [
+        { time: '23:00', activity: 'Depart for Ijen Blue Fire trek' },
+        { time: '05:00', activity: 'Return to hotel, rest' },
+      ]},
+      { day: 'Day 3', items: [
+        { time: '03:00', activity: 'Depart for Bromo sunrise' },
+        { time: '09:00', activity: 'Return transfer, end of tour' },
+      ]},
+    ],
+    faqs: [
+      { question: 'Is accommodation included?', answer: 'Yes, 2 nights at a local guesthouse are included.' },
+      { question: 'Can I customise the itinerary?', answer: 'Yes, contact us before booking for adjustments.' },
+    ],
+  },
+];
+
 function loadStorage() {
   if (typeof window === 'undefined') return defaultState;
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -64,6 +181,258 @@ function loadStorage() {
   } catch {
     return defaultState;
   }
+}
+
+function loadDbConfig() {
+  if (typeof window === 'undefined') {
+    return { url: '', anonKey: '', enabled: false };
+  }
+
+  const raw = localStorage.getItem(DB_CONFIG_KEY);
+  if (!raw) {
+    return { url: '', anonKey: '', enabled: false };
+  }
+
+  try {
+    return { url: '', anonKey: '', enabled: false, ...JSON.parse(raw) };
+  } catch {
+    return { url: '', anonKey: '', enabled: false };
+  }
+}
+
+function saveDbConfig(config) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(config));
+}
+
+function hasDbConfig(config) {
+  return Boolean(config?.url && config?.anonKey);
+}
+
+function sanitizeUrl(url) {
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+function getSupabaseClient(config) {
+  if (!hasDbConfig(config)) return null;
+
+  return createClient(sanitizeUrl(config.url), config.anonKey.trim(), {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function makeTestClient(config) {
+  return createClient(sanitizeUrl(config.url), config.anonKey.trim(), {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function formatSupabaseError(error) {
+  if (!error) return 'Unknown error';
+  if (typeof error === 'string') return error;
+
+  const message = error.message || error.error_description || error.toString();
+  const code = error.code ? ` [${error.code}]` : '';
+  const details = error.details ? ` ${error.details}` : '';
+  const hint = error.hint ? ` Hint: ${error.hint}` : '';
+  return `${message}${code}${details}${hint}`.trim();
+}
+
+function mapTripRowToState(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    overview: row.overview || '',
+    description: row.description || '',
+    highlights: Array.isArray(row.highlights) ? row.highlights : [''],
+    vehicle: row.vehicle || '',
+    duration: row.duration || '',
+    groupSize: row.group_size || '',
+    bestTime: row.best_time || '',
+    price: Number(row.price ?? 0),
+    discount: Number(row.discount ?? 0),
+    status: row.status || 'Active',
+    images: Array.isArray(row.images) ? row.images : [],
+    itinerary: Array.isArray(row.itinerary) ? row.itinerary : [],
+    faqs: Array.isArray(row.faqs) ? row.faqs : [],
+  };
+}
+
+function normalizeTripForDb(trip) {
+  return {
+    id: trip.id,
+    title: trip.title || '',
+    overview: trip.overview || '',
+    description: trip.description || '',
+    vehicle: trip.vehicle || '',
+    duration: trip.duration || '',
+    group_size: trip.groupSize || '',
+    best_time: trip.bestTime || '',
+    price: Number(trip.price ?? 0),
+    discount: Number(trip.discount ?? 0),
+    status: trip.status || 'Active',
+    images: Array.isArray(trip.images) ? trip.images : [],
+    highlights: Array.isArray(trip.highlights) ? trip.highlights : [],
+    itinerary: Array.isArray(trip.itinerary) ? trip.itinerary : [],
+    faqs: Array.isArray(trip.faqs) ? trip.faqs : [],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function mapServiceRowToState(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    type: row.type || 'Per Pax',
+    price: Number(row.price ?? 0),
+    status: row.status || 'Active',
+  };
+}
+
+function normalizeServiceForDb(service) {
+  return {
+    id: service.id,
+    name: service.name || '',
+    type: service.type || 'Per Pax',
+    price: Number(service.price ?? 0),
+    status: service.status || 'Active',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function normalizeSettingsForDb(settings) {
+  return {
+    id: 'main',
+    company_name: settings.companyName || '',
+    address: settings.address || '',
+    phone: settings.phone || '',
+    email: settings.email || '',
+    logo: settings.logo || '',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function mapSettingsRowToState(row) {
+  if (!row) {
+    return defaultState.settings;
+  }
+
+  return {
+    companyName: row.company_name || defaultState.settings.companyName,
+    address: row.address || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    logo: row.logo || '',
+  };
+}
+
+function normalizeMetricsForDb(payload) {
+  return {
+    id: 'main',
+    users: Number(payload.users ?? 0),
+    bookings: Number(payload.bookings ?? 0),
+    revenue: Number(payload.revenue ?? 0),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function pullRemoteData(config) {
+  const supabase = getSupabaseClient(config);
+  if (!supabase) return null;
+
+  const [tripsResult, servicesResult, settingsResult, metricsResult] = await Promise.all([
+    supabase
+      .from('trips')
+      .select('id,title,overview,description,vehicle,duration,group_size,best_time,price,discount,status,images,highlights,itinerary,faqs,updated_at')
+      .order('updated_at', { ascending: false }),
+    supabase
+      .from('services')
+      .select('id,name,type,price,status,updated_at')
+      .order('updated_at', { ascending: false }),
+    supabase
+      .from('site_settings')
+      .select('id,company_name,address,phone,email,logo,updated_at')
+      .eq('id', 'main')
+      .maybeSingle(),
+    supabase
+      .from('site_metrics')
+      .select('id,users,bookings,revenue,updated_at')
+      .eq('id', 'main')
+      .maybeSingle(),
+  ]);
+
+  if (tripsResult.error) throw tripsResult.error;
+  if (servicesResult.error) throw servicesResult.error;
+  if (settingsResult.error) throw settingsResult.error;
+  if (metricsResult.error) throw metricsResult.error;
+
+  return {
+    ...defaultState,
+    trips: (tripsResult.data || []).map(mapTripRowToState),
+    services: (servicesResult.data || []).map(mapServiceRowToState),
+    settings: mapSettingsRowToState(settingsResult.data),
+    users: Number(metricsResult.data?.users ?? defaultState.users),
+    bookings: Number(metricsResult.data?.bookings ?? defaultState.bookings),
+    revenue: Number(metricsResult.data?.revenue ?? defaultState.revenue),
+  };
+}
+
+async function syncCollection(supabase, table, rows) {
+  if (rows.length) {
+    const { error: upsertError } = await supabase
+      .from(table)
+      .upsert(rows, { onConflict: 'id' });
+    if (upsertError) throw upsertError;
+  }
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from(table)
+    .select('id');
+
+  if (existingError) throw existingError;
+
+  const keepIds = new Set(rows.map((row) => row.id));
+  const deleteIds = (existingRows || [])
+    .map((row) => row.id)
+    .filter((id) => !keepIds.has(id));
+
+  if (deleteIds.length) {
+    const { error: deleteError } = await supabase
+      .from(table)
+      .delete()
+      .in('id', deleteIds);
+
+    if (deleteError) throw deleteError;
+  }
+}
+
+async function pushRemoteData(config, payload) {
+  const supabase = getSupabaseClient(config);
+  if (!supabase) {
+    throw new Error('Database config is incomplete.');
+  }
+
+  const tripRows = (payload.trips || []).map(normalizeTripForDb);
+  const serviceRows = (payload.services || []).map(normalizeServiceForDb);
+
+  await syncCollection(supabase, 'trips', tripRows);
+  await syncCollection(supabase, 'services', serviceRows);
+
+  const { error: settingsError } = await supabase
+    .from('site_settings')
+    .upsert(normalizeSettingsForDb(payload.settings || defaultState.settings), { onConflict: 'id' });
+  if (settingsError) throw settingsError;
+
+  const { error: metricsError } = await supabase
+    .from('site_metrics')
+    .upsert(normalizeMetricsForDb(payload), { onConflict: 'id' });
+  if (metricsError) throw metricsError;
 }
 
 function classNames(...classes) {
@@ -295,14 +664,19 @@ function ServicesView({ data, onSave, onDelete, onNotify }) {
   );
 }
 
-function SetupView({ settings, onSave, onNotify }) {
+function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPullDb, onPushDb, onNotify }) {
   const [form, setForm] = useState(settings);
   const [logoPreview, setLogoPreview] = useState(settings.logo || '');
+  const [dbForm, setDbForm] = useState(dbConfig);
 
   useEffect(() => {
     setForm(settings);
     setLogoPreview(settings.logo || '');
   }, [settings]);
+
+  useEffect(() => {
+    setDbForm(dbConfig);
+  }, [dbConfig]);
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -317,6 +691,11 @@ function SetupView({ settings, onSave, onNotify }) {
     event.preventDefault();
     onSave(form);
     onNotify('Setup changes saved successfully', 'success');
+  };
+
+  const handleDbSave = () => {
+    onSaveDbConfig(dbForm);
+    onNotify('Supabase connection settings saved', 'success');
   };
 
   return (
@@ -353,6 +732,44 @@ function SetupView({ settings, onSave, onNotify }) {
             <button className="primary-btn" type="submit">Save Settings</button>
           </div>
         </form>
+      </div>
+
+      <div className="form-card">
+        <SectionHeader title="Database" description="Supabase connection for global sync" />
+        <div className="form-grid">
+          <label>
+            Supabase Project URL
+            <input
+              value={dbForm.url}
+              onChange={(e) => setDbForm((prev) => ({ ...prev, url: e.target.value }))}
+              placeholder="https://your-project-ref.supabase.co"
+            />
+          </label>
+          <label>
+            Supabase Anon Key
+            <input
+              value={dbForm.anonKey}
+              onChange={(e) => setDbForm((prev) => ({ ...prev, anonKey: e.target.value }))}
+              placeholder="eyJhbGciOi..."
+            />
+          </label>
+          <label>
+            Enable Supabase Sync
+            <select
+              value={dbForm.enabled ? 'yes' : 'no'}
+              onChange={(e) => setDbForm((prev) => ({ ...prev, enabled: e.target.value === 'yes' }))}
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </label>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="primary-btn" onClick={handleDbSave}>Save DB Config</button>
+          <button type="button" className="secondary-btn" onClick={() => onTestDb(dbForm)}>Test Connection</button>
+          <button type="button" className="secondary-btn" onClick={() => onPullDb(dbForm)}>Pull from Supabase</button>
+          <button type="button" className="secondary-btn" onClick={() => onPushDb(dbForm)}>Push to Supabase</button>
+        </div>
       </div>
     </div>
   );
@@ -393,6 +810,22 @@ function TripForm({ existing, onSave, onCancel }) {
     const merged = [...previewImages, ...converted].slice(0, 8);
     setPreviewImages(merged);
     setForm((prev) => ({ ...prev, images: merged }));
+  };
+
+  const handleSetFrontImage = (index) => {
+    if (index <= 0 || index >= previewImages.length) return;
+    const reordered = [
+      previewImages[index],
+      ...previewImages.filter((_, idx) => idx !== index),
+    ];
+    setPreviewImages(reordered);
+    setForm((prev) => ({ ...prev, images: reordered }));
+  };
+
+  const handleDeleteImage = (index) => {
+    const updated = previewImages.filter((_, idx) => idx !== index);
+    setPreviewImages(updated);
+    setForm((prev) => ({ ...prev, images: updated }));
   };
 
   const handleHighlightChange = (index, value) => {
@@ -524,9 +957,40 @@ function TripForm({ existing, onSave, onCancel }) {
               Upload images
               <input type="file" accept="image/*" multiple onChange={(e) => handleImageUpload(e.target.files)} />
             </label>
+            {previewImages.length > 0 && (
+              <label>
+                Front Image (Card Cover)
+                <select value="0" onChange={(e) => handleSetFrontImage(Number(e.target.value))}>
+                  {previewImages.map((_, idx) => (
+                    <option key={idx} value={idx}>
+                      {idx === 0 ? `Image ${idx + 1} (Front)` : `Image ${idx + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="image-preview-grid">
               {previewImages.map((src, idx) => (
-                <img key={idx} src={src} alt={`Preview ${idx + 1}`} />
+                <div key={`${idx}-${src.slice(0, 24)}`} className="preview-item">
+                  <img src={src} alt={`Preview ${idx + 1}`} />
+                  <div className="preview-actions">
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => handleSetFrontImage(idx)}
+                      disabled={idx === 0}
+                    >
+                      {idx === 0 ? 'Front Image' : 'Set as Front'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-btn text-btn-danger"
+                      onClick={() => handleDeleteImage(idx)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -602,7 +1066,7 @@ function ServiceForm({ existing, onSave, onCancel }) {
             <p className="section-label">{existing ? 'Edit Service' : 'Add Service'}</p>
             <h2>{existing ? 'Update extra service' : 'Create new service'}</h2>
           </div>
-          <button type="button" type="button" className="close-btn" onClick={onCancel}>×</button>
+          <button type="button" className="close-btn" onClick={onCancel}>×</button>
         </div>
         <form className="form-card" onSubmit={save}>
           <div className="form-grid-2">
@@ -678,25 +1142,54 @@ function downloadFile(filename, data, type) {
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [data, setData] = useState(defaultState);
+  const [dbConfig, setDbConfig] = useState(loadDbConfig());
   const [alert, setAlert] = useState({ message: '', type: 'success' });
   const isInitialMount = useRef(true);
 
+  const notify = (message, type = 'success') => {
+    setAlert({ message, type });
+    window.setTimeout(() => setAlert({ message: '', type }), 3200);
+  };
+
   useEffect(() => {
-    loadStorage().then((stored) => setData(stored));
-  }, []);
+    const boot = async () => {
+      const stored = loadStorage();
+      setData(stored);
+
+      if (!dbConfig?.enabled || !hasDbConfig(dbConfig)) {
+        return;
+      }
+
+      try {
+        const remote = await pullRemoteData(dbConfig);
+        if (remote) {
+          setData(remote);
+          saveStorage(remote);
+        }
+      } catch {
+        notify('Failed to pull data from Supabase on startup.', 'error');
+      }
+    };
+
+    boot();
+  }, [dbConfig]);
 
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
-    saveStorage(data);
-  }, [data]);
 
-  const notify = (message, type = 'success') => {
-    setAlert({ message, type });
-    window.setTimeout(() => setAlert({ message: '', type }), 3200);
-  };
+    saveStorage(data);
+
+    if (!dbConfig?.enabled || !hasDbConfig(dbConfig)) {
+      return;
+    }
+
+    pushRemoteData(dbConfig, data).catch((error) => {
+      notify(`Failed to sync latest changes to Supabase: ${formatSupabaseError(error)}`, 'error');
+    });
+  }, [data, dbConfig]);
 
   const handleAddOrUpdateTrip = (trip, isUpdate) => {
     setData((prev) => ({
@@ -730,8 +1223,113 @@ function App() {
     setData((prev) => ({ ...prev, settings }));
   };
 
+  const handleSaveDbSettings = (config) => {
+    setDbConfig(config);
+    saveDbConfig(config);
+  };
+
+  const handleTestDb = async (overrideConfig) => {
+    const targetConfig = overrideConfig || dbConfig;
+
+    if (!targetConfig.url || !targetConfig.anonKey) {
+      notify('Fill in Supabase Project URL and Anon Key first.', 'error');
+      return;
+    }
+
+    const client = makeTestClient(targetConfig);
+
+    // Step 1: test connectivity + credentials by querying the trips table
+    // NOTE: in supabase-js v2, HTTP status is a top-level field separate from the error object
+    const { error: tripsError, status: tripsStatus } = await client
+      .from('trips')
+      .select('id')
+      .limit(1);
+
+    if (tripsError) {
+      const httpStatus = tripsStatus;
+      const msg = (tripsError.message || '').toLowerCase();
+      const code = tripsError.code || '';
+
+      if (httpStatus === 401 || httpStatus === 403 || msg.includes('jwt') || msg.includes('invalid api key') || msg.includes('apikey')) {
+        notify(
+          'Invalid Anon Key. Open your Supabase project → Settings → API and copy the anon public key.',
+          'error',
+        );
+      } else if (httpStatus === 404 || httpStatus === 406 || code === '42P01' || msg.includes('does not exist') || msg.includes('relation')) {
+        notify(
+          'Connection OK, but table "trips" not found. Run the SQL setup script from README first.',
+          'error',
+        );
+      } else if (!httpStatus || httpStatus === 0 || httpStatus >= 500) {
+        notify(
+          `Cannot reach Supabase. Check the Project URL (format: https://xxxx.supabase.co). Raw error: ${tripsError.message || httpStatus}`,
+          'error',
+        );
+      } else {
+        notify(`Connection error (HTTP ${httpStatus}): ${tripsError.message || code}`, 'error');
+      }
+      return;
+    }
+
+    // Step 2: check remaining tables
+    const remaining = ['services', 'site_settings', 'site_metrics'];
+    const missing = [];
+    for (const table of remaining) {
+      const { error, status } = await client.from(table).select('id').limit(1);
+      if (error && status !== 200) missing.push(table);
+    }
+
+    if (missing.length) {
+      notify(
+        `Connection OK, "trips" found, but missing: ${missing.join(', ')}. Run the SQL setup script from README.`,
+        'error',
+      );
+      return;
+    }
+
+    notify('Supabase connection successful. All tables found ✓', 'success');
+  };
+
+  const handlePullDb = async (overrideConfig) => {
+    const targetConfig = overrideConfig || dbConfig;
+    try {
+      const remote = await pullRemoteData(targetConfig);
+      if (!remote) {
+        notify('No data found in Supabase tables yet.', 'error');
+        return;
+      }
+
+      setData(remote);
+      saveStorage(remote);
+      notify('Data pulled from Supabase.', 'success');
+    } catch (error) {
+      notify(`Failed to pull data from Supabase: ${formatSupabaseError(error)}`, 'error');
+    }
+  };
+
+  const handlePushDb = async (overrideConfig) => {
+    const targetConfig = overrideConfig || dbConfig;
+    try {
+      await pushRemoteData(targetConfig, data);
+      notify('Data pushed to Supabase.', 'success');
+    } catch (error) {
+      notify(`Failed to push data to Supabase: ${formatSupabaseError(error)}`, 'error');
+    }
+  };
+
   const exportJson = () => {
     downloadFile('ijen-admin-data.json', JSON.stringify(data, null, 2), 'application/json');
+  };
+
+  const handleImportFromHomepage = () => {
+    const existingIds = new Set(data.trips.map((t) => t.id));
+    const newTrips = homepageDefaultTrips.filter((t) => !existingIds.has(t.id));
+    if (!newTrips.length) {
+      notify('Homepage packages are already imported.', 'success');
+      return;
+    }
+    setData((prev) => ({ ...prev, trips: [...newTrips, ...prev.trips] }));
+    notify(`${newTrips.length} package(s) imported. Click "Push to Supabase" to sync.`, 'success');
   };
 
   const exportCsv = (section) => {
@@ -795,7 +1393,18 @@ function App() {
       return <ServicesView data={data} onSave={handleSaveService} onDelete={handleDeleteService} onNotify={notify} />;
     }
     if (activePage === 'setup') {
-      return <SetupView settings={data.settings} onSave={handleSaveSettings} onNotify={notify} />;
+      return (
+        <SetupView
+          settings={data.settings}
+          dbConfig={dbConfig}
+          onSave={handleSaveSettings}
+          onSaveDbConfig={handleSaveDbSettings}
+          onTestDb={handleTestDb}
+          onPullDb={handlePullDb}
+          onPushDb={handlePushDb}
+          onNotify={notify}
+        />
+      );
     }
     return <div className="page-panel"><p>Page not found.</p></div>;
   };
@@ -810,6 +1419,7 @@ function App() {
             <p className="top-subtitle">Manage trips, extra services, and global setup from one dashboard.</p>
           </div>
           <div className="toolbar-actions">
+            <button className="primary-btn" onClick={handleImportFromHomepage}>Import Homepage Packages</button>
             <button className="secondary-btn" onClick={exportJson}>Export JSON</button>
             <button className="secondary-btn" onClick={() => exportCsv('trips')}>Export Trips CSV</button>
             <input type="file" accept=".json,.csv" onChange={(e) => handleImport(e.target.files?.[0])} className="file-input" />

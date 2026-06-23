@@ -468,6 +468,24 @@ textarea {
   border: 1px solid var(--border);
 }
 
+.preview-item {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.preview-actions .secondary-btn,
+.preview-actions .ghost-btn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+
 .itinerary-day {
   display: grid;
   gap: 14px;
