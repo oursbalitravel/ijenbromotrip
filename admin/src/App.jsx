@@ -416,7 +416,11 @@ function mapDestinationRowToState(row) {
     slug: slugify(row.slug || row.name || ''),
     name: row.name || '',
     summary: row.summary || '',
+    description: row.description || '',
     image: row.image || '',
+    images: Array.isArray(row.images) ? row.images : [],
+    highlights: Array.isArray(row.highlights) ? row.highlights : [],
+    faqs: Array.isArray(row.faqs) ? row.faqs : [],
     status: row.status || 'Active',
     enabled: row.enabled !== false,
   };
@@ -428,7 +432,11 @@ function normalizeDestinationForDb(destination) {
     slug: slugify(destination.slug || destination.name),
     name: destination.name || '',
     summary: destination.summary || '',
+    description: destination.description || '',
     image: destination.image || '',
+    images: Array.isArray(destination.images) ? destination.images : [],
+    highlights: Array.isArray(destination.highlights) ? destination.highlights.filter(h => h) : [],
+    faqs: Array.isArray(destination.faqs) ? destination.faqs.filter(f => f.question && f.answer) : [],
     status: destination.status || 'Active',
     enabled: destination.enabled !== false,
     updated_at: new Date().toISOString(),
@@ -789,10 +797,8 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
               <tr>
                 <th>Photo</th>
                 <th>Destination</th>
-                <th>Slug</th>
-                <th>Description</th>
+                <th>Slug / Link</th>
                 <th>Visible</th>
-                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -805,10 +811,13 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
                     </div>
                   </td>
                   <td>{item.name}</td>
-                  <td>{item.slug || slugify(item.name)}</td>
-                  <td>{item.summary}</td>
+                  <td>
+                    <div style={{ fontSize: '0.9rem' }}>
+                      <div>{item.slug || slugify(item.name)}</div>
+                      <a href={`destination.html?slug=${encodeURIComponent(item.slug || slugify(item.name))}`} target="_blank" rel="noreferrer" style={{ color: '#0066cc', textDecoration: 'none', fontSize: '0.85rem' }}>View detail →</a>
+                    </div>
+                  </td>
                   <td>{item.enabled !== false ? 'Show' : 'Hide'}</td>
-                  <td>{item.status}</td>
                   <td>
                     <div className="action-group">
                       <button className="text-btn" onClick={() => openEditDestination(item)}>Edit</button>
@@ -819,7 +828,7 @@ function TripsView({ data, onSaveTrip, onDeleteTrip, onSaveDestination, onDelete
               ))}
               {data.destinations.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="empty-row">No destinations available yet.</td>
+                  <td colSpan="5" className="empty-row">No destinations available yet.</td>
                 </tr>
               )}
             </tbody>
@@ -1316,7 +1325,11 @@ function DestinationForm({ existing, onSave, onCancel }) {
     slug: '',
     name: '',
     summary: '',
+    description: '',
     image: '',
+    images: [],
+    highlights: [''],
+    faqs: [{ question: '', answer: '' }],
     status: 'Active',
     enabled: true,
   };
@@ -1331,6 +1344,43 @@ function DestinationForm({ existing, onSave, onCancel }) {
     if (!file) return;
     const url = await convertImageToWebp(file);
     setForm((prev) => ({ ...prev, image: url }));
+  };
+
+  const handleGalleryUpload = async (files) => {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    const converted = await Promise.all(list.map(convertImageToWebp));
+    setForm((prev) => ({ ...prev, images: converted.slice(0, 4) }));
+  };
+
+  const addHighlight = () => {
+    setForm((prev) => ({ ...prev, highlights: [...(prev.highlights || []), ''] }));
+  };
+
+  const updateHighlight = (index, value) => {
+    setForm((prev) => ({
+      ...prev,
+      highlights: (prev.highlights || []).map((item, i) => (i === index ? value : item)),
+    }));
+  };
+
+  const removeHighlight = (index) => {
+    setForm((prev) => ({ ...prev, highlights: (prev.highlights || []).filter((_, i) => i !== index) }));
+  };
+
+  const addFaq = () => {
+    setForm((prev) => ({ ...prev, faqs: [...(prev.faqs || []), { question: '', answer: '' }] }));
+  };
+
+  const updateFaq = (index, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      faqs: (prev.faqs || []).map((item, i) => (i === index ? { ...item, [key]: value } : item)),
+    }));
+  };
+
+  const removeFaq = (index) => {
+    setForm((prev) => ({ ...prev, faqs: (prev.faqs || []).filter((_, i) => i !== index) }));
   };
 
   const handleSubmit = (event) => {
@@ -1374,11 +1424,15 @@ function DestinationForm({ existing, onSave, onCancel }) {
             </label>
           </div>
           <label>
-            Description
-            <textarea value={form.summary} onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))} rows="4" required />
+            Summary
+            <textarea value={form.summary} onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))} rows="2" required />
+          </label>
+          <label>
+            Full Description
+            <textarea value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} rows="4" />
           </label>
           <label className="upload-input">
-            Upload photo (1 image)
+            Main photo
             <input type="file" accept="image/*" onChange={(e) => handleUpload(e.target.files?.[0])} />
           </label>
           {form.image && (
@@ -1386,6 +1440,60 @@ function DestinationForm({ existing, onSave, onCancel }) {
               <img src={form.image} alt={form.name || 'Destination preview'} />
             </div>
           )}
+          <label className="upload-input">
+            Gallery photos (max 4)
+            <input type="file" accept="image/*" multiple onChange={(e) => handleGalleryUpload(e.target.files)} />
+          </label>
+          {form.images && form.images.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+              {form.images.map((src, idx) => (
+                <div key={`${idx}-${src.slice(0, 20)}`} style={{ width: '100%', height: 100, overflow: 'hidden', borderRadius: 4 }}>
+                  <img src={src} alt={`Gallery ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="form-section">
+            <h3>Highlights</h3>
+            {(form.highlights || []).map((highlight, index) => (
+              <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  value={highlight}
+                  onChange={(e) => updateHighlight(index, e.target.value)}
+                  placeholder="Add highlight"
+                  style={{ flex: 1 }}
+                />
+                {(form.highlights || []).length > 1 && (
+                  <button type="button" className="text-btn text-btn-danger" onClick={() => removeHighlight(index)}>Delete</button>
+                )}
+              </div>
+            ))}
+            <button type="button" className="secondary-btn" onClick={addHighlight}>+ Add highlight</button>
+          </div>
+          <div className="form-section">
+            <h3>FAQ</h3>
+            {(form.faqs || []).map((faq, index) => (
+              <div key={index} style={{ marginBottom: 12, padding: '8px', backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                <input
+                  value={faq.question}
+                  onChange={(e) => updateFaq(index, 'question', e.target.value)}
+                  placeholder="Question"
+                  style={{ width: '100%', marginBottom: 4 }}
+                />
+                <textarea
+                  value={faq.answer}
+                  onChange={(e) => updateFaq(index, 'answer', e.target.value)}
+                  placeholder="Answer"
+                  rows="2"
+                  style={{ width: '100%', marginBottom: 4 }}
+                />
+                {(form.faqs || []).length > 1 && (
+                  <button type="button" className="text-btn text-btn-danger" onClick={() => removeFaq(index)}>Delete FAQ</button>
+                )}
+              </div>
+            ))}
+            <button type="button" className="secondary-btn" onClick={addFaq}>+ Add FAQ item</button>
+          </div>
           <div className="form-actions form-actions-end">
             <button type="button" className="ghost-btn" onClick={onCancel}>Cancel</button>
             <button className="primary-btn" type="submit">Save Destination</button>
@@ -1450,6 +1558,16 @@ function LayoutView({ layout, destinations, onSave, onNotify }) {
       ...prev,
       destinationItems: (prev.destinationItems || []).filter((item) => item.id !== id),
     }));
+  };
+
+  const moveDestinationItem = (index, direction) => {
+    setForm((prev) => {
+      const next = [...(prev.destinationItems || [])].map(item => ({ ...item }));
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...prev, destinationItems: next };
+    });
   };
 
   const updateSection = (id, key, value) => {
@@ -1686,19 +1804,28 @@ function LayoutView({ layout, destinations, onSave, onNotify }) {
 
         <div className="form-section">
           <h3>Destination Items</h3>
-          {(form.destinationItems || []).map((item) => (
-            <div key={item.id} className="form-grid-2" style={{ marginBottom: 12 }}>
-              <label>
-                Label
-                <input value={item.label || ''} onChange={(e) => updateDestinationItem(item.id, 'label', e.target.value)} />
-              </label>
-              <label>
-                Show on homepage
-                <select value={item.enabled ? 'yes' : 'no'} onChange={(e) => updateDestinationItem(item.id, 'enabled', e.target.value === 'yes')}>
-                  <option value="yes">Show</option>
-                  <option value="no">Hide</option>
-                </select>
-              </label>
+          {(form.destinationItems || []).map((item, index) => (
+            <div key={item.id} className="form-section" style={{ marginBottom: 12 }}>
+              <div className="button-row" style={{ justifyContent: 'space-between' }}>
+                <strong>{item.label || 'Destination'}</strong>
+                <div className="button-row">
+                  <button type="button" className="secondary-btn" onClick={() => moveDestinationItem(index, -1)}>↑</button>
+                  <button type="button" className="secondary-btn" onClick={() => moveDestinationItem(index, 1)}>↓</button>
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <label>
+                  Label
+                  <input value={item.label || ''} onChange={(e) => updateDestinationItem(item.id, 'label', e.target.value)} />
+                </label>
+                <label>
+                  Show on homepage
+                  <select value={item.enabled ? 'yes' : 'no'} onChange={(e) => updateDestinationItem(item.id, 'enabled', e.target.value === 'yes')}>
+                    <option value="yes">Show</option>
+                    <option value="no">Hide</option>
+                  </select>
+                </label>
+              </div>
               <button type="button" className="text-btn text-btn-danger" onClick={() => removeDestinationItem(item.id)}>Delete item</button>
             </div>
           ))}

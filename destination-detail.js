@@ -48,7 +48,7 @@ function loadAdminDestinations() {
 async function loadDestinationsFromSupabase(config) {
   if (!config.enabled || !config.url || !config.anonKey) return [];
 
-  const endpoint = `${config.url}/rest/v1/destinations?select=id,slug,name,summary,image,status,enabled&order=updated_at.desc`;
+  const endpoint = `${config.url}/rest/v1/destinations?select=*&order=updated_at.desc`;
   const response = await fetch(endpoint, {
     headers: {
       apikey: config.anonKey,
@@ -66,7 +66,11 @@ async function loadDestinationsFromSupabase(config) {
     slug: slugify(row.slug || row.name || ''),
     name: row.name || '',
     summary: row.summary || '',
+    description: row.description || '',
     image: row.image || '',
+    images: Array.isArray(row.images) ? row.images : [],
+    highlights: Array.isArray(row.highlights) ? row.highlights : [],
+    faqs: Array.isArray(row.faqs) ? row.faqs : [],
     status: row.status || 'Active',
     enabled: row.enabled !== false,
   }));
@@ -83,33 +87,68 @@ function renderDestination(destination) {
 
   const image = destination.image || 'https://via.placeholder.com/1200x700?text=Destination';
   const title = destination.name || 'Untitled Destination';
+  const gallery = Array.isArray(destination.images) && destination.images.length > 0 ? destination.images : [image];
+  const highlightsHtml = Array.isArray(destination.highlights) && destination.highlights.length > 0
+    ? `<section class="trip-detail-highlights">
+         <h2>Highlights</h2>
+         <ul>
+           ${destination.highlights.map(h => `<li>${h}</li>`).join('')}
+         </ul>
+       </section>`
+    : '';
+  
+  const faqsHtml = Array.isArray(destination.faqs) && destination.faqs.length > 0
+    ? `<section class="trip-detail-faqs">
+         <h2>Frequently Asked Questions</h2>
+         <div class="faq-list">
+           ${destination.faqs.map(f => `
+             <details class="faq-item">
+               <summary>${f.question}</summary>
+               <p>${f.answer}</p>
+             </details>
+           `).join('')}
+         </div>
+       </section>`
+    : '';
+
+  const galleryHtml = gallery.length > 1
+    ? `<div class="trip-media-side">
+         ${gallery.slice(1, 5).map(img => `<img src="${img}" alt="${title}" />`).join('')}
+       </div>`
+    : `<div class="trip-media-side">
+         <img src="${image}" alt="${title}" />
+         <img src="${image}" alt="${title}" />
+         <img src="${image}" alt="${title}" />
+         <img src="${image}" alt="${title}" />
+       </div>`;
 
   root.innerHTML = `
     <article class="trip-detail-shell">
       <section class="trip-media-grid">
         <img class="trip-media-main" src="${image}" alt="${title}" />
-        <div class="trip-media-side">
-          <img src="${image}" alt="${title}" />
-          <img src="${image}" alt="${title}" />
-          <img src="${image}" alt="${title}" />
-          <img src="${image}" alt="${title}" />
-        </div>
+        ${galleryHtml}
       </section>
 
       <section class="trip-detail-head">
-        <p class="section-label">Trip Destination</p>
+        <p class="section-label">Destination</p>
         <h1>${title}</h1>
         <p>${destination.summary || ''}</p>
       </section>
 
-      <section class="trip-detail-meta">
-        <div><strong>Status</strong><span>${destination.status || '-'}</span></div>
-        <div><strong>Slug</strong><span>${destination.slug || slugify(destination.name)}</span></div>
-      </section>
-
+      ${destination.description ? `
       <section class="trip-detail-body">
-        <h2>About Destination</h2>
-        <p>${destination.summary || 'No destination summary available yet.'}</p>
+        <h2>About</h2>
+        <p>${destination.description}</p>
+      </section>
+      ` : ''}
+
+      ${highlightsHtml}
+
+      ${faqsHtml}
+
+      <section class="trip-detail-meta">
+        <div><strong>Status</strong><span>${destination.status || 'Active'}</span></div>
+        <div><strong>Slug</strong><span>${destination.slug || slugify(destination.name)}</span></div>
       </section>
     </article>
   `;
