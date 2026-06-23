@@ -42,6 +42,13 @@ add column if not exists description text not null default '',
 add column if not exists images jsonb not null default '[]'::jsonb,
 add column if not exists highlights jsonb not null default '[]'::jsonb,
 add column if not exists faqs jsonb not null default '[]'::jsonb;
+
+-- Tambah kolom setting booking/currency jika belum ada
+alter table public.site_settings
+add column if not exists currency_code text not null default 'IDR',
+add column if not exists whatsapp_message_prefix text not null default 'Halo, saya ingin booking trip ini: ',
+add column if not exists whatsapp_message_suffix text not null default '',
+add column if not exists whatsapp_url_position text not null default 'after';
 ```
 - **Jika table belum ada**: Gunakan SQL CREATE di step 1, sudah termasuk semua field baru.
 
@@ -96,6 +103,10 @@ create table if not exists public.site_settings (
    address text not null default '',
    phone text not null default '',
    email text not null default '',
+   currency_code text not null default 'IDR',
+   whatsapp_message_prefix text not null default 'Halo, saya ingin booking trip ini: ',
+   whatsapp_message_suffix text not null default '',
+   whatsapp_url_position text not null default 'after',
    logo text not null default '',
    updated_at timestamptz not null default now()
 );
@@ -207,6 +218,9 @@ with check (id = 'main');
 - Isi `Supabase Project URL` dan `Supabase Anon Key`.
 - Aktifkan `Enable Supabase Sync` lalu klik `Save DB Config`.
 - Gunakan `Test Connection`, `Pull from Supabase`, dan `Push to Supabase` sesuai kebutuhan.
+- `WhatsApp Booking Number` memakai field phone yang sama di setup.
+- `Currency Code` dipakai untuk semua tampilan harga di web.
+- `WhatsApp Message Prefix`, `WhatsApp URL Position`, dan `WhatsApp Message Suffix` mengatur teks order otomatis ke WhatsApp.
 
 Catatan:
 - Homepage akan membaca koneksi database dari setup admin (`ijen-bromo-db-config`) sehingga cukup setup sekali di admin.

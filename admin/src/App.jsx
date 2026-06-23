@@ -136,6 +136,10 @@ const defaultState = {
     address: 'Jl. Bromo No. 12, East Java, Indonesia',
     phone: '+62 812 3456 7890',
     email: 'support@ijenbromotrip.com',
+    currencyCode: 'IDR',
+    whatsappMessagePrefix: 'Halo, saya ingin booking trip ini: ',
+    whatsappMessageSuffix: '',
+    whatsappUrlPosition: 'after',
     logo: '',
   },
   destinations: [
@@ -473,6 +477,10 @@ function normalizeSettingsForDb(settings) {
     address: settings.address || '',
     phone: settings.phone || '',
     email: settings.email || '',
+    currency_code: settings.currencyCode || 'IDR',
+    whatsapp_message_prefix: settings.whatsappMessagePrefix || '',
+    whatsapp_message_suffix: settings.whatsappMessageSuffix || '',
+    whatsapp_url_position: settings.whatsappUrlPosition || 'after',
     logo: settings.logo || '',
     updated_at: new Date().toISOString(),
   };
@@ -488,6 +496,10 @@ function mapSettingsRowToState(row) {
     address: row.address || '',
     phone: row.phone || '',
     email: row.email || '',
+    currencyCode: row.currency_code || defaultState.settings.currencyCode,
+    whatsappMessagePrefix: row.whatsapp_message_prefix || defaultState.settings.whatsappMessagePrefix,
+    whatsappMessageSuffix: row.whatsapp_message_suffix || defaultState.settings.whatsappMessageSuffix,
+    whatsappUrlPosition: row.whatsapp_url_position || defaultState.settings.whatsappUrlPosition,
     logo: row.logo || '',
   };
 }
@@ -521,7 +533,7 @@ async function pullRemoteData(config) {
       .order('updated_at', { ascending: false }),
     supabase
       .from('site_settings')
-      .select('id,company_name,address,phone,email,logo,updated_at')
+      .select('id,company_name,address,phone,email,currency_code,whatsapp_message_prefix,whatsapp_message_suffix,whatsapp_url_position,logo,updated_at')
       .eq('id', 'main')
       .maybeSingle(),
     supabase
@@ -984,12 +996,41 @@ function SetupView({ settings, dbConfig, onSave, onSaveDbConfig, onTestDb, onPul
               <input value={form.address} onChange={(e) => handleChange('address', e.target.value)} required />
             </label>
             <label>
-              Phone Number
+              WhatsApp Booking Number
               <input value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} required />
             </label>
             <label>
               Email
               <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} required />
+            </label>
+            <label>
+              Currency Code
+              <input value={form.currencyCode || 'IDR'} onChange={(e) => handleChange('currencyCode', e.target.value.toUpperCase())} placeholder="IDR" maxLength={3} />
+            </label>
+            <label>
+              WhatsApp Message Prefix
+              <textarea
+                rows="3"
+                value={form.whatsappMessagePrefix || ''}
+                onChange={(e) => handleChange('whatsappMessagePrefix', e.target.value)}
+                placeholder="Halo, saya ingin booking trip ini: "
+              />
+            </label>
+            <label>
+              WhatsApp URL Position
+              <select value={form.whatsappUrlPosition || 'after'} onChange={(e) => handleChange('whatsappUrlPosition', e.target.value)}>
+                <option value="after">After text</option>
+                <option value="before">Before text</option>
+              </select>
+            </label>
+            <label>
+              WhatsApp Message Suffix
+              <textarea
+                rows="3"
+                value={form.whatsappMessageSuffix || ''}
+                onChange={(e) => handleChange('whatsappMessageSuffix', e.target.value)}
+                placeholder=""
+              />
             </label>
             <label className="logo-upload">
               Logo Upload

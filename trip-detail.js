@@ -42,13 +42,29 @@ function loadAdminTrips() {
 }
 
 function loadAdminSettings() {
+  const fallback = {
+    currencyCode: 'IDR',
+    phone: '',
+    whatsappMessagePrefix: 'Halo, saya ingin booking trip ini: ',
+    whatsappMessageSuffix: '',
+    whatsappUrlPosition: 'after',
+  };
+
   try {
     const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw);
-    return parsed?.settings || null;
+    return {
+      ...fallback,
+      ...(parsed?.settings || {}),
+      currencyCode: (parsed?.settings?.currencyCode || fallback.currencyCode).toUpperCase(),
+      phone: parsed?.settings?.phone || '',
+      whatsappMessagePrefix: parsed?.settings?.whatsappMessagePrefix || fallback.whatsappMessagePrefix,
+      whatsappMessageSuffix: parsed?.settings?.whatsappMessageSuffix || fallback.whatsappMessageSuffix,
+      whatsappUrlPosition: parsed?.settings?.whatsappUrlPosition || fallback.whatsappUrlPosition,
+    };
   } catch {
-    return null;
+    return fallback;
   }
 }
 
@@ -86,29 +102,40 @@ async function loadTripsFromSupabase(config) {
   }));
 }
 
-function formatCurrency(value) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
+function formatCurrency(value, currencyCode = 'IDR') {
+  const code = (currencyCode || 'IDR').toUpperCase();
+  try {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'code',
+      maximumFractionDigits: 0,
+    }).format(Number(value || 0));
+  } catch {
+    return `${code} ${Number(value || 0).toLocaleString('id-ID')}`;
+  }
 }
 
 function normalizePhone(phone) {
   return (phone || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
 }
 
-function buildOrderLink(trip) {
-  const settings = loadAdminSettings();
+function buildWhatsAppMessage(settings, pageUrl) {
+  const prefix = settings?.whatsappMessagePrefix || 'Halo, saya ingin booking trip ini: ';
+  const suffix = settings?.whatsappMessageSuffix || '';
+  const url = pageUrl || window.location.href;
+  const ordered = (settings?.whatsappUrlPosition || 'after') === 'before'
+    ? [url, prefix, suffix]
+    : [prefix, url, suffix];
+
+  return ordered.map((part) => String(part || '').trim()).filter(Boolean).join(' ');
+}
+
+function buildOrderLink(settings) {
   const phone = normalizePhone(settings?.phone || '');
-  const message = encodeURIComponent(`Hello, I want to order: ${trip.title || 'Trip package'}`);
-  if (phone) {
-    return `https://wa.me/${phone}?text=${message}`;
-  }
-  if (settings?.email) {
-    return `mailto:${settings.email}?subject=${encodeURIComponent(`Order request - ${trip.title || 'Trip package'}`)}&body=${message}`;
-  }
-  return '#overview';
+  if (!phone) return '#overview';
+  const message = encodeURIComponent(buildWhatsAppMessage(settings, window.location.href));
+  return `https://wa.me/${phone}?text=${message}`;
 }
 
 function getTripImages(trip) {
@@ -170,9 +197,8 @@ function getSlugParam() {
 function renderTrip(trip) {
   const root = document.getElementById('trip-detail-root');
   if (!root) return;
-
+  const settings = loadAdminSettings();
   const images = getTripImages(trip);
-
   const highlights = Array.isArray(trip.highlights) ? trip.highlights.filter(Boolean) : [];
   const itinerary = Array.isArray(trip.itinerary) ? trip.itinerary : [];
   const faqs = Array.isArray(trip.faqs) ? trip.faqs : [];
@@ -183,7 +209,7 @@ function renderTrip(trip) {
     { id: 'cost', label: 'Cost' },
     { id: 'know-before-you-go', label: 'Know before you go' },
   ];
-  const orderLink = buildOrderLink(trip);
+  const orderLink = buildOrderLink(settings);
 
   root.innerHTML = `
     <article class="trip-detail-shell">
@@ -250,7 +276,7 @@ function renderTrip(trip) {
             <div class="trip-cost-inline">
               <div>
                 <p class="section-label">From</p>
-                <strong>${formatCurrency(trip.price)}</strong>
+                <strong>${formatCurrency(trip.price, settings.currencyCode)}</strong>
               </div>
               <div>
                 <p class="section-label">Discount</p>
@@ -278,12 +304,12 @@ function renderTrip(trip) {
         <aside class="trip-detail-sidebar">
           <div class="trip-sticky-card">
             <div class="trip-sticky-price-header">
-              <span>Rp IDR</span>
+              <span>${(settings.currencyCode || 'IDR').toUpperCase()}</span>
               <span class="trip-sticky-badge">Best price guaranteed</span>
             </div>
             <div class="trip-sticky-price-block">
               <p>From</p>
-              <strong>${formatCurrency(trip.price)}</strong>
+              <strong>${formatCurrency(trip.price, settings.currencyCode)}</strong>
               <span>/ Adult</span>
             </div>
             <ul class="trip-includes-list">
@@ -327,8 +353,7 @@ async function bootTripPage() {
   const slug = getSlugParam();
   const config = resolveConfig();
 
-  let trips = [];
-  trips = await loadTripsFromSupabase(config);
+  let trips = await loadTripsFromSupabase(config);
   if (!trips.length) {
     trips = loadAdminTrips();
   }

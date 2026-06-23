@@ -116,6 +116,16 @@ function loadAdminData() {
   }
 }
 
+function loadAdminSettings(adminData) {
+  return adminData?.settings || {
+    currencyCode: 'IDR',
+    phone: '',
+    whatsappMessagePrefix: 'Halo, saya ingin booking trip ini: ',
+    whatsappMessageSuffix: '',
+    whatsappUrlPosition: 'after',
+  };
+}
+
 function loadAdminTrips(adminData) {
   if (adminData && Array.isArray(adminData.trips)) {
     return adminData.trips.map((trip) => ({
@@ -364,6 +374,20 @@ function renderFaq(layout) {
   });
 }
 
+function formatCurrency(value, currencyCode = 'IDR') {
+  const code = (currencyCode || 'IDR').toUpperCase();
+  try {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'code',
+      maximumFractionDigits: 0,
+    }).format(Number(value || 0));
+  } catch {
+    return `${code} ${Number(value || 0).toLocaleString('id-ID')}`;
+  }
+}
+
 function getTripCardImage(trip) {
   if (!trip) return 'https://via.placeholder.com/600x450?text=Trip';
 
@@ -372,7 +396,7 @@ function getTripCardImage(trip) {
   return image || 'https://via.placeholder.com/600x450?text=Trip';
 }
 
-function createPackageCard(trip) {
+function createPackageCard(trip, settings) {
   const slug = trip.slug || slugify(trip.title);
   const article = document.createElement('article');
   article.className = 'package-card';
@@ -383,7 +407,7 @@ function createPackageCard(trip) {
       <p>${trip.overview || trip.description || 'Explore this amazing package with our expert guides.'}</p>
       <div class="card-meta">
         <span>${trip.duration || trip.groupSize || 'N/A'}</span>
-        <span class="price">$${trip.price ?? 0} / person</span>
+        <span class="price">${formatCurrency(trip.price, settings?.currencyCode)} / person</span>
       </div>
       <a href="trip.html?slug=${encodeURIComponent(slug)}" class="card-cta">View Details</a>
     </div>
@@ -397,6 +421,7 @@ async function renderAdminPackages() {
 
   const dbConfig = resolveSupabaseConfig();
   const adminData = loadAdminData();
+  const settings = loadAdminSettings(adminData);
   const layout = resolveLayout(adminData);
 
   applyHeaderMenu(layout);
@@ -462,7 +487,7 @@ async function renderAdminPackages() {
   const total = Math.max(1, columns) * Math.max(1, rows);
 
   grid.style.gridTemplateColumns = `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`;
-  adminTrips.slice(0, total).forEach((trip) => grid.appendChild(createPackageCard(trip)));
+  adminTrips.slice(0, total).forEach((trip) => grid.appendChild(createPackageCard(trip, settings)));
 }
 
 window.addEventListener('load', renderAdminPackages);
