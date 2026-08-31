@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Login - Ijen Bromo Trip</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="auth-page">
+    <div class="auth-card">
+      <h1>Admin Sign In</h1>
+      <form id="loginForm">
+        <label>
+          Email
+          <input id="email" type="email" required />
+        </label>
+        <label>
+          Password
+          <input id="password" type="password" required />
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="primary-btn">Sign in</button>
+        </div>
+      </form>
+      <p id="message" style="color:red;visibility:hidden;margin-top:8px;"></p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+  <script>
+    (function () {
+      const DB_CONFIG_KEY = 'ijen-bromo-db-config';
+      const msgEl = document.getElementById('message');
+
+      function showMessage(text) {
+        msgEl.textContent = text || '';
+        msgEl.style.visibility = text ? 'visible' : 'hidden';
+      }
+
+      const cfgRaw = localStorage.getItem(DB_CONFIG_KEY) || '{}';
+      let cfg = {};
+      try { cfg = JSON.parse(cfgRaw); } catch (e) { cfg = {}; }
+
+      if (!cfg.url || !cfg.anonKey) {
+        showMessage('Supabase not configured. Open admin Setup and save the DB config.');
+        document.getElementById('loginForm').style.display = 'none';
+        throw new Error('missing supabase config');
+      }
+
+      const supabase = supabase.createClient(cfg.url, cfg.anonKey);
+
+      const form = document.getElementById('loginForm');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        showMessage('Signing in...');
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        try {
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) {
+            showMessage(error.message || 'Sign-in failed');
+            return;
+          }
+          // On successful sign-in, Supabase persists session and we redirect to admin.
+          window.location.href = '/admin/';
+        } catch (err) {
+          showMessage(err?.message || 'Sign-in error');
+        }
+      });
+    }());
+  </script>
+</body>
+</html>

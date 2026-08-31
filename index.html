@@ -25,7 +25,7 @@
         <button class="ghost-btn">EN</button>
         <button class="ghost-btn">USD</button>
         <a class="text-btn" href="#signup">Sign Up</a>
-        <a class="primary-btn" href="#book">Login</a>
+        <button id="admin-btn" class="primary-btn">Admin</button>
       </div>
     </div>
   </header>
@@ -194,7 +194,31 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
   <script src="script.js"></script>
   <script src="homepage-data.js"></script>
+
+  <!-- Admin login modal -->
+  <div id="admin-login-modal" aria-hidden="true" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:1200;">
+    <div style="background:#fff;border-radius:8px;max-width:420px;width:92%;padding:20px;box-shadow:0 6px 24px rgba(0,0,0,0.2);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0">Admin Sign In</h3>
+        <button id="admin-login-close" aria-label="Close" style="background:transparent;border:0;font-size:18px;">×</button>
+      </div>
+      <form id="admin-login-form">
+        <label style="display:block;margin-bottom:8px">Email
+          <input id="admin-email" type="email" required style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:4px;" />
+        </label>
+        <label style="display:block;margin-bottom:8px">Password
+          <input id="admin-password" type="password" required style="width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:4px;" />
+        </label>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;">
+          <button type="button" id="admin-login-cancel" class="ghost-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Sign in</button>
+        </div>
+        <p id="admin-login-message" style="color:#b00020;margin-top:10px;display:none"></p>
+      </form>
+    </div>
+  </div>
 </body>
 </html>

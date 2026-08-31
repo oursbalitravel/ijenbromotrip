@@ -356,8 +356,8 @@ function getSupabaseClient(config) {
 
   return createClient(sanitizeUrl(config.url), config.anonKey.trim(), {
     auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+      persistSession: true,
+      autoRefreshToken: true,
     },
   });
 }
@@ -640,6 +640,7 @@ function Sidebar({ active, onSelect, settings }) {
     { key: 'dashboard', label: 'Dashboard', icon: '📊' },
     { key: 'trips', label: 'Trip', icon: '🧳' },
     { key: 'layout', label: 'Layout', icon: '🧱' },
+    { key: 'admins', label: 'Admins', icon: '🔐' },
     { key: 'services', label: 'Extra Service', icon: '✨' },
     { key: 'setup', label: 'Setting', icon: '⚙️' },
   ];
@@ -2297,6 +2298,128 @@ function ServiceForm({ existing, currencyCode = 'IDR', onSave, onCancel }) {
   );
 }
 
+function AdminsView({ dbConfig, onNotify }) {
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [newId, setNewId] = useState('');
+
+  useEffect(() => {
+    fetchAdmins();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbConfig]);
+
+  async function fetchAdmins() {
+    if (!dbConfig?.enabled || !hasDbConfig(dbConfig)) {
+      setAdmins([]);
+      return;
+    }
+
+    const supabase = getSupabaseClient(dbConfig);
+    if (!supabase) {
+      onNotify('Supabase client not available. Check DB config.', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('admins').select('user_id,created_at').order('created_at', { ascending: false });
+      if (error) throw error;
+      setAdmins(data || []);
+    } catch (err) {
+      onNotify(`Failed to load admins: ${err.message || err}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdd() {
+    if (!newId || !newId.trim()) {
+      onNotify('Paste a user UUID from Supabase Auth dashboard.', 'error');
+      return;
+    }
+    const supabase = getSupabaseClient(dbConfig);
+    if (!supabase) return onNotify('Supabase client not available.', 'error');
+
+    try {
+      const { error } = await supabase.from('admins').insert([{ user_id: newId.trim() }]);
+      if (error) throw error;
+      setNewId('');
+      onNotify('Admin added successfully', 'success');
+      fetchAdmins();
+    } catch (err) {
+      onNotify(`Failed to add admin: ${err.message || err}`, 'error');
+    }
+  }
+
+  async function handleRemove(userId) {
+    if (!confirm(`Remove admin ${userId}?`)) return;
+    const supabase = getSupabaseClient(dbConfig);
+    if (!supabase) return onNotify('Supabase client not available.', 'error');
+
+    try {
+      const { error } = await supabase.from('admins').delete().eq('user_id', userId);
+      if (error) throw error;
+      onNotify('Admin removed', 'success');
+      fetchAdmins();
+    } catch (err) {
+      onNotify(`Failed to remove admin: ${err.message || err}`, 'error');
+    }
+  }
+
+  return (
+    <div className="page-panel">
+      <SectionHeader title="Admins" description="Manage admin users (by Supabase user UUID)" />
+
+      <div className="form-card">
+        <p className="label-note">Add a user UUID from Supabase Authentication → Users. This UI requires you to paste the user's UUID (not email).</p>
+        <div className="form-grid-2" style={{ alignItems: 'end' }}>
+          <label>
+            User UUID
+            <input value={newId} onChange={(e) => setNewId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" />
+          </label>
+          <div>
+            <button className="primary-btn" type="button" onClick={handleAdd}>Add Admin</button>
+            <a className="text-btn" href="https://app.supabase.com" target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>Open Supabase</a>
+          </div>
+        </div>
+      </div>
+
+      <div className="form-card">
+        <SectionHeader title="Admin List" description={loading ? 'Loading…' : `${admins.length} admin(s)`} />
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>User UUID</th>
+                <th>Added</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {admins.map((a) => (
+                <tr key={a.user_id}>
+                  <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{a.user_id}</td>
+                  <td>{new Date(a.created_at || Date.now()).toLocaleString()}</td>
+                  <td>
+                    <div className="action-group">
+                      <button className="text-btn text-btn-danger" onClick={() => handleRemove(a.user_id)}>Remove</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {admins.length === 0 && (
+                <tr>
+                  <td colSpan="3" className="empty-row">No admins found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function convertImageToWebp(file) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -2354,13 +2477,27 @@ function App() {
         return;
       }
 
+      // Ensure user is authenticated before loading remote admin data.
       try {
+        const supabase = getSupabaseClient(dbConfig);
+        if (!supabase) {
+          notify('Supabase client not available. Check DB config.', 'error');
+          return;
+        }
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData?.session) {
+          // Not signed in: redirect to public login page.
+          window.location.href = '/login.html';
+          return;
+        }
+
         const remote = await pullRemoteData(dbConfig, stored);
         if (remote) {
           setData(remote);
           saveStorage(remote);
         }
-      } catch {
+      } catch (err) {
         notify('Failed to pull data from Supabase on startup.', 'error');
       }
     };
@@ -2704,6 +2841,9 @@ function App() {
     }
     if (activePage === 'services') {
       return <ServicesView data={data} onSave={handleSaveService} onDelete={handleDeleteService} onNotify={notify} />;
+    }
+    if (activePage === 'admins') {
+      return <AdminsView dbConfig={dbConfig} onNotify={notify} />;
     }
     if (activePage === 'setup') {
       return (

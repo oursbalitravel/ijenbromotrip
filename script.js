@@ -1,4 +1,5 @@
 const ADMIN_STORAGE_KEY = 'ijen-bromo-admin-data';
+const DB_CONFIG_KEY = 'ijen-bromo-db-config';
 const slides = document.querySelectorAll('.hero-slide');
 const prevButton = document.querySelector('.carousel-arrow.prev');
 const nextButton = document.querySelector('.carousel-arrow.next');
@@ -102,3 +103,72 @@ prevButton.addEventListener('click', prevSlide);
 
 setInterval(nextSlide, 6000);
 applyWhatsAppLinks();
+
+// Admin login modal handling
+function showAdminLogin() {
+  const modal = document.getElementById('admin-login-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function hideAdminLogin() {
+  const modal = document.getElementById('admin-login-modal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden', 'true');
+  const msg = document.getElementById('admin-login-message');
+  if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+}
+
+function showAdminMessage(text) {
+  const msg = document.getElementById('admin-login-message');
+  if (!msg) return;
+  msg.textContent = text || '';
+  msg.style.display = text ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const adminBtn = document.getElementById('admin-btn');
+  if (adminBtn) adminBtn.addEventListener('click', (e) => { e.preventDefault(); showAdminLogin(); });
+
+  const cancelBtn = document.getElementById('admin-login-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => hideAdminLogin());
+
+  const closeBtn = document.getElementById('admin-login-close');
+  if (closeBtn) closeBtn.addEventListener('click', () => hideAdminLogin());
+
+  const form = document.getElementById('admin-login-form');
+  if (!form) return;
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    showAdminMessage('Signing in...');
+
+    const cfgRaw = window.localStorage.getItem(DB_CONFIG_KEY) || '{}';
+    let cfg = {};
+    try { cfg = JSON.parse(cfgRaw); } catch { cfg = {}; }
+
+    if (!cfg.url || !cfg.anonKey) {
+      showAdminMessage('Supabase not configured. Configure DB in Admin Setup first.');
+      return;
+    }
+
+    const email = document.getElementById('admin-email').value.trim();
+    const password = document.getElementById('admin-password').value;
+
+    try {
+      const supabaseClient = supabase.createClient(cfg.url, cfg.anonKey);
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        showAdminMessage(error.message || 'Sign-in failed');
+        return;
+      }
+
+      // on success redirect to admin area
+      window.location.href = '/admin/';
+    } catch (err) {
+      showAdminMessage(err?.message || 'Sign-in error');
+    }
+  });
+});
