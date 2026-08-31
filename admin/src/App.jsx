@@ -2447,6 +2447,16 @@ function App() {
 
   const handleSaveLayout = (layout) => {
     setData((prev) => ({ ...prev, layout }));
+
+    // If Supabase is configured, push layout immediately so homepage reflects changes after refresh.
+    if (dbConfig?.enabled && hasDbConfig(dbConfig)) {
+      const next = { ...data, layout };
+      pushRemoteData(dbConfig, next).then(() => {
+        notify('Layout pushed to Supabase and will appear on homepage after refresh.', 'success');
+      }).catch((err) => {
+        notify(`Failed to push layout to Supabase: ${formatSupabaseError(err)}`, 'error');
+      });
+    }
   };
 
   const handleSaveDbSettings = (config) => {
