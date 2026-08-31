@@ -490,12 +490,12 @@ function createPackageCard(trip, settings) {
     <img src="${image}" alt="${trip.title || 'Trip package'}" />
     <div class="card-content">
       <h3>${trip.title || 'Untitled Package'}</h3>
-      <p>${trip.overview || trip.description || 'Explore this amazing package with our expert guides.'}</p>
+      <p>${trip.overview || trip.description || 'Nikmati pengalaman lokal yang dipandu oleh pemandu berpengalaman.'}</p>
       <div class="card-meta">
         <span>${trip.duration || trip.groupSize || 'N/A'}</span>
         <span class="price">${formatCurrency(trip.price, settings?.currencyCode)} / person</span>
       </div>
-      <a href="trip.html?slug=${encodeURIComponent(slug)}" class="card-cta">View Details</a>
+      <a href="trip.html?slug=${encodeURIComponent(slug)}" class="card-cta">Lihat Detail</a>
     </div>
   `;
   return article;
