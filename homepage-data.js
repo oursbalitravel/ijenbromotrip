@@ -393,7 +393,7 @@ function renderDestinations(layout, destinations) {
     const card = document.createElement('article');
     card.className = 'destination-card';
     card.innerHTML = `
-      <img src="${item.image || 'https://via.placeholder.com/800x600?text=Destination'}" alt="${item.name || 'Destination'}" />
+      <img src="${item.image || 'https://via.placeholder.com/800x600?text=Destination'}" alt="${item.name || 'Destination'}" loading="lazy" decoding="async" />
       <div>
         <h3><a href="destination.html?slug=${encodeURIComponent(item.slug || slugify(item.name))}">${item.name || 'Destination'}</a></h3>
       </div>
@@ -487,7 +487,7 @@ function createPackageCard(trip, settings) {
   const article = document.createElement('article');
   article.className = 'package-card';
   article.innerHTML = `
-    <img src="${image}" alt="${trip.title || 'Trip package'}" />
+    <img src="${image}" alt="${trip.title || 'Trip package'}" loading="lazy" decoding="async" />
     <div class="card-content">
       <h3>${trip.title || 'Untitled Package'}</h3>
       <p>${trip.overview || trip.description || 'Nikmati pengalaman lokal yang dipandu oleh pemandu berpengalaman.'}</p>

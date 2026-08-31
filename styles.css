@@ -117,6 +117,18 @@ a {
   background: var(--primary-dark);
 }
 
+/* Accessible focus outlines */
+.primary-btn:focus {
+  outline: 3px solid rgba(255,91,0,0.14);
+  outline-offset: 2px;
+}
+
+.text-btn:focus,
+.ghost-btn:focus {
+  outline: 2px dashed rgba(0,0,0,0.12);
+  outline-offset: 3px;
+}
+
 .hero {
   position: relative;
   min-height: 520px;
@@ -891,12 +903,13 @@ a {
   .hero-content {
     padding-left: 0;
     padding-top: 120px;
+  }
+
   .trip-detail-layout {
     grid-template-columns: 1fr;
   }
   .trip-detail-sidebar {
     position: static;
-  }
   }
 }
 

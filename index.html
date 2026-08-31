@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <a class="skip-link" href="#main-content" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">Skip to content</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="#hero">Ijen Bromo Trip</a>
@@ -30,7 +31,7 @@
     </div>
   </header>
 
-  <main>
+  <main id="main-content" role="main">
     <section class="hero" id="hero">
       <div class="hero-carousel" aria-label="Featured destinations carousel">
         <div class="hero-slide active" style="background-image: url('https://images.unsplash.com/photo-1500048993953-1a5b4c618f89?auto=format&fit=crop&w=1400&q=80');"></div>
@@ -43,39 +44,39 @@
       <div class="container hero-content">
         <h1>Jelajahi Ijen & Bromo bersama pemandu lokal</h1>
         <p class="hero-copy">Petualangan yang dirancang oleh pemandu setempat—mulai dari blue fire Ijen hingga sunrise di Bromo. Pilih paket yang sesuai ritme perjalanan Anda.</p>
-        <form class="hero-search" action="#packages" method="get">
+        <form class="hero-search" action="#packages" method="get" role="search" aria-label="Cari paket dan destinasi">
           <input id="search-input" name="search" type="search" placeholder="Cari paket atau destinasi (mis. Ijen, Bromo)" />
           <button type="submit">Cari</button>
         </form>
       </div>
     </section>
 
-    <section class="section" id="packages">
+    <section class="section" id="packages" role="region" aria-labelledby="packages-heading">
       <div class="container">
         <div class="section-header">
           <p class="section-label">Paket Populer</p>
-          <h2>Paket Pilihan untuk Ijen & Bromo</h2>
+          <h2 id="packages-heading">Paket Pilihan untuk Ijen & Bromo</h2>
           <p>Rangkaian paket terpilih yang memudahkan kunjungan Anda ke Ijen, Bromo, dan air terjun terbaik di Jawa Timur.</p>
         </div>
         <div id="packages-grid" class="grid cards-grid"></div>
       </div>
     </section>
 
-    <section class="section section-alt" id="destinations">
+    <section class="section section-alt" id="destinations" role="region" aria-labelledby="destinations-heading">
       <div class="container">
         <div class="section-header">
-          <p class="section-label">Explore East Java</p>
-          <h2>Explore Top Destinations in East Java</h2>
+          <p class="section-label">Destinasi</p>
+          <h2 id="destinations-heading">Destinasi Terbaik di Jawa Timur</h2>
         </div>
         <div class="grid dest-grid"></div>
       </div>
     </section>
 
-    <section class="section" id="why-us">
+    <section class="section" id="why-us" role="region" aria-labelledby="why-heading">
       <div class="container">
         <div class="section-header">
-          <p class="section-label">Why Us</p>
-          <h2>Why Choose Ijen Bromo Trip?</h2>
+          <p class="section-label">Kenapa Kami</p>
+          <h2 id="why-heading">Kenapa Memilih Ijen Bromo Trip?</h2>
         </div>
         <div class="grid features-grid">
           <article class="feature-card">
@@ -98,21 +99,21 @@
       </div>
     </section>
 
-    <section class="section cta-section" id="book">
+    <section class="section cta-section" id="book" role="region" aria-labelledby="cta-heading">
       <div class="container cta-inner">
         <div>
-          <p class="section-label">Ready to explore?</p>
-          <h2>Plan Your Ijen Bromo Adventure Today</h2>
+          <p class="section-label">Siap Berpetualang?</p>
+          <h2 id="cta-heading">Rencanakan Perjalanan Ijen & Bromo Anda</h2>
         </div>
         <a class="primary-btn" href="#packages">Book Now</a>
       </div>
     </section>
 
-    <section class="section" id="blog">
+    <section class="section" id="blog" role="region" aria-labelledby="blog-heading">
       <div class="container">
         <div class="section-header">
-          <p class="section-label">Travel Tips</p>
-          <h2>Travel Guide & Tips for Ijen Bromo</h2>
+          <p class="section-label">Blog</p>
+          <h2 id="blog-heading">Tips & Panduan Perjalanan</h2>
         </div>
         <div class="grid blog-grid">
           <article class="blog-card">
